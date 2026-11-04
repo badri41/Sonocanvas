@@ -1,0 +1,24 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Manim renders
+media/
+
+# Audio outputs (prototype reference WAVs are kept)
+*.wav
+!prototype/*.wav
+
+# TeX intermediates (paper/main.pdf is a deliverable, not ignored)
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+.DS_Store
