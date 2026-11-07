@@ -7,14 +7,14 @@ import numpy as np
 
 from .freq_map import image_to_mag
 from .image_prep import load, preprocess, render_text
-from .metrics import psnr, recover, spectral_convergence, ssim
+from .metrics import auc, psnr, recover, spectral_convergence, ssim
 from .phase import griffin_lim
 from .stft import istft, stft, window
 from .stft import window as _make_window
 
 __all__ = ["encode", "decode", "load", "render_text", "preprocess", "image_to_mag",
            "stft", "istft", "window", "griffin_lim", "recover", "ssim", "psnr",
-           "spectral_convergence"]
+           "spectral_convergence", "auc"]
 
 
 def encode(img: np.ndarray, *, n_fft: int = 1024, hop: int = 256, dur: float = 5.0,

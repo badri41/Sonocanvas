@@ -1,7 +1,9 @@
 r"""SonoCanvas controlled experiments (SPEC.md section 3).
 
 Each experiment computes data/<name>.npz, then plots figures/<name>.{pdf,png} from that file only.
-results/table.csv collects every (experiment, image, param, SSIM, SSIM std, PSNR).
+results/table.csv collects every (experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR).
+AUC is the legibility score: how well decoded intensity separates target pixels from background.
+On the photo, 'target pixels' just means T > 0.5, the bright half of a continuous-tone image.
 
     python experiments.py                       # everything
     python experiments.py noise_robustness      # one experiment
@@ -21,7 +23,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.ndimage import binary_dilation, binary_erosion
+from scipy.ndimage import binary_dilation, binary_erosion, uniform_filter
 from skimage import data as skdata
 from skimage.color import rgb2gray
 from skimage.metrics import structural_similarity
@@ -62,16 +64,18 @@ def trial(img: np.ndarray, seeds=SEEDS, refs: dict | None = None, **p) -> dict:
     r"""Encode and decode once per seed. Each `refs` entry also scores \hat{I} resized onto its grid."""
     dec = {k: v for k, v in p.items() if k not in ("n_iter", "init")}
     refs = refs or {}
-    out = {"ssim": [], "psnr": []} | {f"{m}_{k}": [] for k in refs for m in ("ssim", "psnr")}
+    out = {"ssim": [], "psnr": [], "auc": []} | {f"{m}_{k}": [] for k in refs for m in ("ssim", "psnr", "auc")}
     for s in seeds:
         x, info = sc.encode(img, seed=s, **p)
         rec = sc.decode(x, **dec)
         out["ssim"].append(sc.ssim(info["target"], rec))
         out["psnr"].append(sc.psnr(info["target"], rec))
+        out["auc"].append(sc.auc(info["target"], rec))
         for k, ref in refs.items():
             r2 = np.clip(resize(rec, ref.shape, anti_aliasing=True), 0, 1)
             out[f"ssim_{k}"].append(sc.ssim(ref, r2))
             out[f"psnr_{k}"].append(sc.psnr(ref, r2))
+            out[f"auc_{k}"].append(sc.auc(ref, r2))
             if s == seeds[0]:
                 out[f"rec_{k}"] = r2
         if s == seeds[0]:
@@ -88,14 +92,36 @@ def show(a: plt.Axes, img: np.ndarray, title: str) -> None:
     a.spines[:].set_visible(False)
 
 
-def row(exp: str, image: str, param: str, ssims, psnrs) -> list:
-    return [exp, image, param, f"{np.mean(ssims):.4f}", f"{np.std(ssims):.4f}", f"{np.mean(psnrs):.2f}"]
+def row(exp: str, image: str, param: str, ssims, psnrs, aucs) -> list:
+    return [exp, image, param, f"{np.mean(aucs):.4f}", f"{np.std(aucs):.4f}",
+            f"{np.mean(ssims):.4f}", f"{np.std(ssims):.4f}", f"{np.mean(psnrs):.2f}"]
 
 
 def save(name: str, **arrays) -> None:
     np.savez_compressed(DATA / f"{name}.npz", **{
         k: v.astype(np.float32) if isinstance(v, np.ndarray) and v.dtype == float else v
         for k, v in arrays.items()})
+
+
+def flat_stats(target: np.ndarray, rec: np.ndarray) -> dict:
+    r"""What SSIM does over flat target regions: 7x7 windows with \sigma_T^2 < C_2.
+
+    frac: share of such windows. var: mean \sigma_R^2. lum: mean luminance term l. ssim, rest: mean
+    SSIM map on and off them. pred: mean of l C_2/(\sigma_R^2 + C_2), the flat-target approximation.
+    """
+    c1, c2 = 0.01 ** 2, 0.03 ** 2
+    _, smap = structural_similarity(target, rec, data_range=1.0, full=True)
+    mean = lambda a: uniform_filter(a, 7)
+    var = lambda a: (mean(a ** 2) - mean(a) ** 2) * 49 / 48  # sample variance, as in skimage
+    mt, mr, vr = mean(target), mean(rec), var(rec)
+    flat = var(target) < c2
+    flat[:3], flat[-3:], flat[:, :3], flat[:, -3:] = False, False, False, False  # skimage crops the border
+    body = np.zeros_like(flat)
+    body[3:-3, 3:-3] = True
+    lum = (2 * mt * mr + c1) / (mt ** 2 + mr ** 2 + c1)
+    return {"flat_frac": flat.sum() / body.sum(), "flat_var": vr[flat].mean(), "flat_lum": lum[flat].mean(),
+            "flat_ssim": smap[flat].mean(), "rest_ssim": smap[body & ~flat].mean(),
+            "flat_pred": (lum * c2 / (vr + c2))[flat].mean()}
 
 
 def diagnostics(target: np.ndarray, rec: np.ndarray) -> dict:
@@ -131,13 +157,14 @@ def edges_vs_filled(imgs: dict) -> list:
     for n in NAMES:
         for mode in ("raw", "edges"):
             t = trial(sc.preprocess(imgs[n], mode))
-            rows.append(row("edges_vs_filled", n, mode, t["ssim"], t["psnr"]))
+            rows.append(row("edges_vs_filled", n, mode, t["ssim"], t["psnr"], t["auc"]))
             d = diagnostics(t["target"], t["rec"])
             for k in ("support", "ls_gain", "interior", "interior_pred"):  # seed 0 only: no std
                 if np.isfinite(d[k]):
-                    rows.append(["edges_vs_filled", n, f"{mode}/{k}", f"{d[k]:.4f}", "", ""])
+                    rows.append(["edges_vs_filled", n, f"{mode}/{k}", "", "", f"{d[k]:.4f}", "", ""])
             arrs |= {f"{n}_{mode}_target": t["target"], f"{n}_{mode}_rec": t["rec"],
-                     f"{n}_{mode}_ssim": np.mean(t["ssim"]), f"{n}_{mode}_energy": np.sum(t["x"] ** 2)}
+                     f"{n}_{mode}_ssim": np.mean(t["ssim"]), f"{n}_{mode}_auc": np.mean(t["auc"]),
+                     f"{n}_{mode}_energy": np.sum(t["x"] ** 2)}
             arrs |= {f"{n}_{mode}_{k}": v for k, v in d.items()}
     save("edges_vs_filled", **arrs)
     return rows
@@ -148,7 +175,7 @@ def plot_edges_vs_filled(d) -> plt.Figure:
     for i, n in enumerate(NAMES):
         for j, mode in enumerate(("raw", "edges")):
             for a, key, title in ((ax[i, 2 * j], "target", f"{LABEL[n]}: {mode}, target"),
-                                  (ax[i, 2 * j + 1], "rec", f"decoded, SSIM {d[f'{n}_{mode}_ssim']:.3f}")):
+                                  (ax[i, 2 * j + 1], "rec", f"AUC {d[f'{n}_{mode}_auc']:.3f}, SSIM {d[f'{n}_{mode}_ssim']:.3f}")):
                 show(a, d[f"{n}_{mode}_{key}"], title)
     return fig
 
@@ -170,15 +197,19 @@ def sweep_window_len(imgs: dict) -> list:
         full = resize(img, (260, 900), anti_aliasing=True)
         refs = {"image": full, "half": resize(img, (130, 450), anti_aliasing=True)}
         scores = {k: [] for k in ("own", "image", "half")}
+        aucs = {k: [] for k in scores}
         for N in LENGTHS:
             t = trial(img, refs=refs, n_fft=N, hop=N // 4)
             for k in scores:
-                sk, pk = ("ssim", "psnr") if k == "own" else (f"ssim_{k}", f"psnr_{k}")
-                rows.append(row("sweep_window_len", n, f"N={N}/{k}", t[sk], t[pk]))
+                sk, pk, ak = ("ssim", "psnr", "auc") if k == "own" else (f"ssim_{k}", f"psnr_{k}", f"auc_{k}")
+                rows.append(row("sweep_window_len", n, f"N={N}/{k}", t[sk], t[pk], t[ak]))
                 scores[k].append(t[sk])
+                aucs[k].append(t[ak])
+            arrs |= {f"{n}_{k}_{N}": v for k, v in flat_stats(full, t["rec_image"]).items()}
             if n == "text":
                 arrs[f"text_rec_{N}"] = t["rec_image"]
         arrs |= {f"{n}_{k}": np.array(v) for k, v in scores.items()}
+        arrs |= {f"{n}_{k}_auc": np.array(v) for k, v in aucs.items()}
     save("sweep_window_len", **arrs)
     return rows
 
@@ -221,8 +252,10 @@ def sweep_window_type(imgs: dict) -> list:
         arrs[f"{w}_bins"], arrs[f"{w}_db"], arrs[f"{w}_sidelobe_db"] = window_spectrum(w)
         for n in NAMES:
             t = trial(sc.preprocess(imgs[n], MODE[n]), window=w)
-            rows.append(row("sweep_window_type", n, w, t["ssim"], t["psnr"]))
+            rows.append(row("sweep_window_type", n, w, t["ssim"], t["psnr"], t["auc"]))
             arrs[f"{n}_{w}_ssim"] = np.array(t["ssim"])
+            arrs[f"{n}_{w}_auc"] = np.array(t["auc"])
+            arrs |= {f"{n}_{w}_{k}": v for k, v in flat_stats(t["target"], t["rec"]).items()}
             if n == "text":
                 arrs[f"text_{w}_rec"] = t["rec"]
     save("sweep_window_type", **arrs)
@@ -259,15 +292,17 @@ def gl_iterations(imgs: dict) -> list:
         arrs[f"{n}_errs_random"] = np.array(
             [trial(img, seeds=(s,), n_iter=CURVE_LEN)["errs"] for s in SEEDS])
         arrs[f"{n}_errs_zero"] = np.array(trial(img, seeds=(0,), n_iter=CURVE_LEN, init="zero")["errs"])
-        ssim_r, ssim_z = [], []
+        ssim_r, ssim_z, auc_r = [], [], []
         for k in ITERS:
             r = trial(img, n_iter=k)
             z = trial(img, seeds=(0,), n_iter=k, init="zero")
-            rows.append(row("gl_iterations", n, f"random/iter={k}", r["ssim"], r["psnr"]))
-            rows.append(row("gl_iterations", n, f"zero/iter={k}", z["ssim"], z["psnr"]))
+            rows.append(row("gl_iterations", n, f"random/iter={k}", r["ssim"], r["psnr"], r["auc"]))
+            rows.append(row("gl_iterations", n, f"zero/iter={k}", z["ssim"], z["psnr"], z["auc"]))
             ssim_r.append(r["ssim"])
+            auc_r.append(r["auc"])
             ssim_z.append(z["ssim"][0])
-        arrs |= {f"{n}_ssim_random": np.array(ssim_r), f"{n}_ssim_zero": np.array(ssim_z)}
+        arrs |= {f"{n}_ssim_random": np.array(ssim_r), f"{n}_ssim_zero": np.array(ssim_z),
+                 f"{n}_auc_random": np.array(auc_r)}
     save("gl_iterations", **arrs)
     return rows
 
@@ -318,12 +353,12 @@ def mel_vs_linear(imgs: dict) -> list:
         for enc in ("linear", "mel"):
             t = trial(img, scale=enc)
             ref = resize(img, t["target"].shape, anti_aliasing=True)
-            rows.append(row("mel_vs_linear", n, f"encode={enc}/bin_grid", t["ssim"], t["psnr"]))
+            rows.append(row("mel_vs_linear", n, f"encode={enc}/bin_grid", t["ssim"], t["psnr"], t["auc"]))
             for vw in ("linear", "mel"):
                 v = view(t["rec"], vw)
-                s, p = sc.ssim(ref, v), sc.psnr(ref, v)
-                rows.append(["mel_vs_linear", n, f"encode={enc}/view={vw}", f"{s:.4f}", "", f"{p:.2f}"])
-                arrs |= {f"{n}_{enc}_{vw}_img": v, f"{n}_{enc}_{vw}_ssim": s}
+                s, p, u = sc.ssim(ref, v), sc.psnr(ref, v), sc.auc(ref, v)
+                rows.append(["mel_vs_linear", n, f"encode={enc}/view={vw}", f"{u:.4f}", "", f"{s:.4f}", "", f"{p:.2f}"])
+                arrs |= {f"{n}_{enc}_{vw}_img": v, f"{n}_{enc}_{vw}_ssim": s, f"{n}_{enc}_{vw}_auc": u}
     save("mel_vs_linear", **arrs)
     return rows
 
@@ -333,7 +368,7 @@ def plot_mel_vs_linear(d) -> plt.Figure:
     for i, enc in enumerate(("linear", "mel")):
         for j, vw in enumerate(("linear", "mel")):
             show(ax[i, j], d[f"text_{enc}_{vw}_img"],
-                 f"{enc} $\\to$ {vw}: SSIM {float(d[f'text_{enc}_{vw}_ssim']):.3f}")
+                 f"{enc} $\\to$ {vw}: AUC {float(d[f'text_{enc}_{vw}_auc']):.3f}")
     fig.suptitle("encoding axis $\\to$ viewing axis", fontsize=8)
     return fig
 
@@ -342,14 +377,15 @@ def plot_mel_vs_linear(d) -> plt.Figure:
 SNRS = (30, 20, 10, 5, 0)
 
 
-def noisy_scores(x: np.ndarray, target: np.ndarray, sigma: float) -> tuple[list, list]:
-    ss, ps = [], []
+def noisy_scores(x: np.ndarray, target: np.ndarray, sigma: float) -> tuple[list, list, list]:
+    ss, ps, us = [], [], []
     for s in SEEDS:
         y = x + sigma * np.random.default_rng(100 + s).standard_normal(x.size)
         rec = sc.decode(y)
         ss.append(sc.ssim(target, rec))
         ps.append(sc.psnr(target, rec))
-    return ss, ps
+        us.append(sc.auc(target, rec))
+    return ss, ps, us
 
 
 def noise_robustness(imgs: dict) -> list:
@@ -367,9 +403,10 @@ def noise_robustness(imgs: dict) -> list:
             enc[n, mode] = sc.encode(sc.preprocess(imgs[n], mode))
     for (n, mode), (x, info) in enc.items():
         res = [noisy_scores(x, info["target"], sig(x, s)) for s in SNRS]
-        for s, (ss, ps) in zip(SNRS, res):
-            rows.append(row("noise_robustness", n, f"{mode}/snr={s}", ss, ps))
+        for s, (ss, ps, us) in zip(SNRS, res):
+            rows.append(row("noise_robustness", n, f"{mode}/snr={s}", ss, ps, us))
         arrs[f"{n}_{mode}_ssim"] = np.array([r[0] for r in res])
+        arrs[f"{n}_{mode}_auc"] = np.array([r[2] for r in res])
     x, info = enc["text", "edges"]
     for s in SNRS:
         y = x + sig(x, s) * np.random.default_rng(100).standard_normal(x.size)
@@ -378,9 +415,10 @@ def noise_robustness(imgs: dict) -> list:
     for mode in ("raw", "edges"):
         x, info = enc["text", mode]
         res = [noisy_scores(x, info["target"], sig(x_raw, s)) for s in SNRS]
-        for s, (ss, ps) in zip(SNRS, res):
-            rows.append(row("noise_robustness", "text", f"{mode}/floor={s}", ss, ps))
+        for s, (ss, ps, us) in zip(SNRS, res):
+            rows.append(row("noise_robustness", "text", f"{mode}/floor={s}", ss, ps, us))
         arrs[f"text_{mode}_floor_ssim"] = np.array([r[0] for r in res])
+        arrs[f"text_{mode}_floor_auc"] = np.array([r[2] for r in res])
     save("noise_robustness", **arrs)
     return rows
 
@@ -409,7 +447,7 @@ def plot_noise_robustness(d) -> plt.Figure:
 EXPERIMENTS = {f.__name__: (f, globals()[f"plot_{f.__name__}"]) for f in (
     edges_vs_filled, sweep_window_len, sweep_window_type, gl_iterations, mel_vs_linear,
     noise_robustness)}
-HEADER = ["experiment", "image", "param", "ssim", "ssim_std", "psnr_db"]
+HEADER = ["experiment", "image", "param", "auc", "auc_std", "ssim", "ssim_std", "psnr_db"]
 
 
 def update_table(new: dict[str, list]) -> None:

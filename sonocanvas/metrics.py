@@ -1,5 +1,6 @@
 """Decoding audio back to an image, and image/spectral quality metrics."""
 import numpy as np
+from scipy.stats import rankdata
 from skimage.metrics import structural_similarity
 from skimage.transform import resize
 
@@ -21,6 +22,17 @@ def ssim(a: np.ndarray, b: np.ndarray) -> float:
 def psnr(a: np.ndarray, b: np.ndarray) -> float:
     r"""PSNR = 10 \log_{10}(1 / \mathrm{MSE}) dB for images in [0, 1]."""
     return float(10 * np.log10(1.0 / np.mean((a - b) ** 2)))
+
+
+def auc(target: np.ndarray, rec: np.ndarray) -> float:
+    r"""Stroke/background ROC-AUC of the decoded image, as the Mann-Whitney statistic:
+    A = P(\hat{I}_s > \hat{I}_b) + \tfrac12 P(\hat{I}_s = \hat{I}_b), for s a stroke pixel (T > 0.5)
+    and b a background pixel. Depends only on the order of pixel values, so any increasing map of
+    \hat{I} leaves it unchanged. A = 1 is perfect separation; A = 0.5 is none.
+    """
+    stroke = target.ravel() > 0.5
+    n1, n0 = stroke.sum(), (~stroke).sum()
+    return float((rankdata(rec.ravel())[stroke].sum() - n1 * (n1 + 1) / 2) / (n1 * n0))
 
 
 def recover(x: np.ndarray, n_fft: int, hop: int, win: np.ndarray,
