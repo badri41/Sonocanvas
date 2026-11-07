@@ -206,6 +206,7 @@ def sweep_window_len(imgs: dict) -> list:
                 scores[k].append(t[sk])
                 aucs[k].append(t[ak])
             arrs |= {f"{n}_{k}_{N}": v for k, v in flat_stats(full, t["rec_image"]).items()}
+            arrs |= {f"{n}_own_{k}_{N}": v for k, v in flat_stats(t["target"], t["rec"]).items()}
             if n == "text":
                 arrs[f"text_rec_{N}"] = t["rec_image"]
         arrs |= {f"{n}_{k}": np.array(v) for k, v in scores.items()}
@@ -215,22 +216,26 @@ def sweep_window_len(imgs: dict) -> list:
 
 
 def plot_sweep_window_len(d) -> plt.Figure:
-    fig = plt.figure(figsize=(3.5, 3.5), layout="constrained")
-    top, bot = fig.subfigures(2, 1, height_ratios=[1, 1.9])
+    fig = plt.figure(figsize=(3.5, 4.6), layout="constrained")
+    top, bot = fig.subfigures(2, 1, height_ratios=[1, 4])
     ax = top.subplots(1, 3)
     for a, N in zip(ax, (128, 1024, 4096)):
         show(a, d[f"text_rec_{N}"], f"$N={N}$")
-    a = bot.subplots()
+    a, b = bot.subplots(2, 1, sharex=True)
     L = d["lengths"]
     for n in NAMES:
-        a.plot(L, d[f"{n}_image"].mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
-    a.plot(L, d["text_own"].mean(1), color=COLOR["text"], marker=MARK["text"], ls=":", mfc="white",
-           label="text, own-grid score")
-    a.set_xscale("log", base=2)
-    a.set_xticks(L, [str(v) for v in L])
-    a.minorticks_off()
-    a.set(xlabel="window length $N$ (hop $N/4$)", ylabel="SSIM")
-    a.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=2)
+        a.plot(L, 1 - d[f"{n}_image_auc"].mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
+        b.plot(L, d[f"{n}_image"].mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
+    b.plot(L, d["text_own"].mean(1), color=COLOR["text"], marker=MARK["text"], ls=":", mfc="white",
+           label="text, own grid")
+    a.set_yscale("log")
+    b.set_xscale("log", base=2)
+    b.set_xticks(L, [str(v) for v in L])
+    b.minorticks_off()
+    a.set(ylabel="$1-$AUC")
+    b.set(xlabel="window length $N$ (hop $N/4$)", ylabel="SSIM")
+    a.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=3)
+    b.legend(loc="lower center", ncols=2)
     return fig
 
 
@@ -263,19 +268,24 @@ def sweep_window_type(imgs: dict) -> list:
 
 
 def plot_sweep_window_type(d) -> plt.Figure:
-    fig, (a, b) = plt.subplots(1, 2, figsize=(7.16, 2.3), layout="constrained")
-    for w, c, ls in zip(WINDOWS, ("#2a78d6", "#eb6834", "#1baf7a", "#6250d6"), ("-", "-", "--", ":")):
-        a.plot(d[f"{w}_bins"], d[f"{w}_db"], color=c, ls=ls, lw=1.1,
-               label=f"{w} (sidelobe {float(d[f'{w}_sidelobe_db']):.0f} dB)")
+    fig, (a, c, b) = plt.subplots(1, 3, figsize=(7.16, 2.3), layout="constrained", width_ratios=[1.5, 1, 1])
+    for w, col, ls in zip(WINDOWS, ("#2a78d6", "#eb6834", "#1baf7a", "#6250d6"), ("-", "-", "--", ":")):
+        a.plot(d[f"{w}_bins"], d[f"{w}_db"], color=col, ls=ls, lw=1.1,
+               label=f"{w} ({float(d[f'{w}_sidelobe_db']):.0f} dB)")
     a.set(xlabel="offset from centre (DFT bins)", ylabel="$|W|$ (dB re peak)", ylim=(-100, 3), xlim=(0, 12))
     a.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=2)
     x = np.arange(len(WINDOWS))
     for i, n in enumerate(NAMES):
-        y = [d[f"{n}_{w}_ssim"].mean() for w in WINDOWS]
-        b.plot(x + (i - 1) * 0.1, y, color=COLOR[n], marker=MARK[n], ls="", label=LABEL[n])
-    b.set_xticks(x, WINDOWS)
-    b.set(ylabel="SSIM", ylim=(0, 1), xlim=(-0.4, 3.4))
-    b.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=3)
+        off = x + (i - 1) * 0.1
+        c.plot(off, [1 - d[f"{n}_{w}_auc"].mean() for w in WINDOWS], color=COLOR[n], marker=MARK[n], ls="", label=LABEL[n])
+        b.plot(off, [d[f"{n}_{w}_ssim"].mean() for w in WINDOWS], color=COLOR[n], marker=MARK[n], ls="", label=LABEL[n])
+    for p in (b, c):
+        p.set_xticks(x, ["rect", "hann", "hamm.", "black."])
+        p.set_xlim(-0.4, 3.4)
+    c.set_yscale("log")
+    c.set(ylabel="$1-$AUC")
+    b.set(ylabel="SSIM", ylim=(0, 1))
+    c.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=2)
     return fig
 
 
@@ -308,20 +318,23 @@ def gl_iterations(imgs: dict) -> list:
 
 
 def plot_gl_iterations(d) -> plt.Figure:
-    fig, (a, b) = plt.subplots(2, 1, figsize=(3.5, 3.9), sharex=True, layout="constrained")
+    fig, (a, c, b) = plt.subplots(3, 1, figsize=(3.5, 4.9), sharex=True, layout="constrained")
     it = np.arange(CURVE_LEN)
     for n in NAMES:
         a.plot(it + 1, d[f"{n}_errs_random"].mean(0), color=COLOR[n], label=f"{LABEL[n]}, random")
         a.plot(it + 1, d[f"{n}_errs_zero"], color=COLOR[n], ls=":", label=f"{LABEL[n]}, zero")
+        c.plot(d["iters"] + 1, 1 - d[f"{n}_auc_random"].mean(1), color=COLOR[n], marker=MARK[n])
         b.plot(d["iters"] + 1, d[f"{n}_ssim_random"].mean(1), color=COLOR[n], marker=MARK[n])
         b.plot(d["iters"] + 1, d[f"{n}_ssim_zero"], color=COLOR[n], marker=MARK[n], ls=":", mfc="white")
     a.set_xscale("log")
+    c.set_yscale("log")
     ticks = [1, 2, 3, 6, 11, 21, 61, 101, 201]
     b.set_xticks(ticks, [str(t - 1) for t in ticks])
     b.minorticks_off()
     a.set(ylabel="spectral convergence")
+    c.set(ylabel="$1-$AUC")
     b.set(xlabel="Griffin-Lim iteration", ylabel="SSIM")
-    a.legend(ncols=3, loc="upper center", bbox_to_anchor=(0.5, 1.28), handlelength=1.6, columnspacing=0.9)
+    a.legend(ncols=3, loc="lower center", bbox_to_anchor=(0.5, 1.0), handlelength=1.6, columnspacing=0.9)
     return fig
 
 
@@ -424,21 +437,25 @@ def noise_robustness(imgs: dict) -> list:
 
 
 def plot_noise_robustness(d) -> plt.Figure:
-    fig = plt.figure(figsize=(3.5, 4.7), layout="constrained")
-    top, bot = fig.subfigures(2, 1, height_ratios=[1, 4.2])
+    fig = plt.figure(figsize=(3.5, 5.6), layout="constrained")
+    top, bot = fig.subfigures(2, 1, height_ratios=[1, 5.4])
     for a, snr in zip(top.subplots(1, 3), (20, 10, 0)):
         show(a, d[f"text_edges_rec_{snr}"], f"{snr} dB")
-    a, b = bot.subplots(2, 1, sharex=True)
+    a, m, b = bot.subplots(3, 1, sharex=True)
     s = d["snrs"]
     for n in NAMES:
-        y = d[f"{n}_{MODE[n]}_ssim"]
-        a.errorbar(s, y.mean(1), y.std(1), color=COLOR[n], marker=MARK[n], capsize=2, label=LABEL[n])
-    a.set(ylabel="SSIM", ylim=(0, 1))
+        y, u = d[f"{n}_{MODE[n]}_ssim"], d[f"{n}_{MODE[n]}_auc"]
+        a.plot(s, 1 - u.mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
+        m.errorbar(s, y.mean(1), y.std(1), color=COLOR[n], marker=MARK[n], capsize=2, label=LABEL[n])
+    a.set_yscale("log")
+    a.set(ylabel="$1-$AUC")
+    m.set(ylabel="SSIM", ylim=(0, 1))
     a.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=3)
-    for key, ls, tag in (("ssim", "-", "same SNR"), ("floor_ssim", ":", "same noise floor")):
-        b.plot(s, d[f"text_raw_{key}"].mean(1), color=MUTED, marker="D", ls=ls, mfc="white", label=f"raw, {tag}")
-        b.plot(s, d[f"text_edges_{key}"].mean(1), color=COLOR["text"], marker="o", ls=ls, label=f"edges, {tag}")
-    b.set(xlabel="SNR (dB)", ylabel="SSIM", ylim=(0, 1))
+    for key, ls, tag in (("auc", "-", "same SNR"), ("floor_auc", ":", "same noise floor")):
+        b.plot(s, 1 - d[f"text_raw_{key}"].mean(1), color=MUTED, marker="D", ls=ls, mfc="white", label=f"filled, {tag}")
+        b.plot(s, 1 - d[f"text_edges_{key}"].mean(1), color=COLOR["text"], marker="o", ls=ls, label=f"edges, {tag}")
+    b.set_yscale("log")
+    b.set(xlabel="SNR (dB)", ylabel="text $1-$AUC")
     b.invert_xaxis()
     b.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=2)
     return fig
