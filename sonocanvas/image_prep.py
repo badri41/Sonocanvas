@@ -16,7 +16,8 @@ def load(path: str) -> np.ndarray:
 
 
 def render_text(text: str, w: int = 900, h: int = 260) -> np.ndarray:
-    r"""White bold text (DejaVu Sans Bold, 170 px) centred on a black w x h canvas, in [0, 1].
+    r"""White bold text (DejaVu Sans Bold, 170 px, smaller if wider than 0.92 w) centred on a black
+    w x h canvas, in [0, 1].
 
     With glyph bbox (b_0, b_1, b_2, b_3): origin = ((w - (b_2 - b_0))/2 - b_0, (h - (b_3 - b_1))/2 - b_1).
     """
@@ -24,6 +25,9 @@ def render_text(text: str, w: int = 900, h: int = 260) -> np.ndarray:
     d = ImageDraw.Draw(img)
     f = ImageFont.truetype(str(FONT), 170)  # raises if missing; no silent fallback
     b0, b1, b2, b3 = d.textbbox((0, 0), text, font=f)
+    if b2 - b0 > 0.92 * w:  # shrink long text to fit
+        f = ImageFont.truetype(str(FONT), int(170 * 0.92 * w / (b2 - b0)))
+        b0, b1, b2, b3 = d.textbbox((0, 0), text, font=f)
     d.text(((w - (b2 - b0)) / 2 - b0, (h - (b3 - b1)) / 2 - b1), text, fill=255, font=f)
     return np.asarray(img, float) / 255.0
 

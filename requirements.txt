@@ -5,3 +5,4 @@ Pillow==13.0.0
 matplotlib==3.11.2
 pytest==9.2.0
 streamlit==1.66.1
+manim==0.22.1

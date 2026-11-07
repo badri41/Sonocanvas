@@ -7,8 +7,8 @@ from scipy.io import wavfile
 from . import decode, encode, preprocess, psnr, render_text, ssim
 
 
-def save_png(path: str, target: np.ndarray, rec: np.ndarray, info: dict, s: float, p: float,
-             dur: float = 5.0, f_lo: float = 1000, f_hi: float = 8000) -> None:
+def figure(target: np.ndarray, rec: np.ndarray, info: dict, s: float, p: float,
+           dur: float = 5.0, f_lo: float = 1000, f_hi: float = 8000):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -24,8 +24,7 @@ def save_png(path: str, target: np.ndarray, rec: np.ndarray, info: dict, s: floa
         a.set_ylabel("frequency (kHz)")
     ax[1].set_xlabel("time (s)")
     fig.tight_layout()
-    fig.savefig(path, dpi=120)
-    plt.close(fig)
+    return fig
 
 
 def main() -> None:
@@ -44,7 +43,7 @@ def main() -> None:
     print(f"wrote {a.out} ({len(x) / info['sr']:.2f} s @ {info['sr']} Hz)  "
           f"SSIM={s:.4f}  PSNR={p:.2f} dB  SC={info['errs'][-1]:.4f}")
     if a.png:
-        save_png(a.png, info["target"], rec, info, s, p)
+        figure(info["target"], rec, info, s, p).savefig(a.png, dpi=120)
         print(f"wrote {a.png}")
 
 

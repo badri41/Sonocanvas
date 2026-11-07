@@ -10,6 +10,7 @@ media/
 # Audio outputs (prototype reference WAVs are kept)
 *.wav
 !prototype/*.wav
+!demo/*.wav
 
 # TeX intermediates (paper/main.pdf is a deliverable, not ignored)
 *.aux
