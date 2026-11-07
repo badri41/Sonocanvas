@@ -175,7 +175,7 @@ def plot_edges_vs_filled(d) -> plt.Figure:
     for i, n in enumerate(NAMES):
         for j, mode in enumerate(("raw", "edges")):
             for a, key, title in ((ax[i, 2 * j], "target", f"{LABEL[n]}: {mode}, target"),
-                                  (ax[i, 2 * j + 1], "rec", f"AUC {d[f'{n}_{mode}_auc']:.3f}, SSIM {d[f'{n}_{mode}_ssim']:.3f}")):
+                                  (ax[i, 2 * j + 1], "rec", f"AUC {d[f'{n}_{mode}_auc']:.4f}, SSIM {d[f'{n}_{mode}_ssim']:.3f}")):
                 show(a, d[f"{n}_{mode}_{key}"], title)
     return fig
 
@@ -216,8 +216,8 @@ def sweep_window_len(imgs: dict) -> list:
 
 
 def plot_sweep_window_len(d) -> plt.Figure:
-    fig = plt.figure(figsize=(3.5, 4.6), layout="constrained")
-    top, bot = fig.subfigures(2, 1, height_ratios=[1, 4])
+    fig = plt.figure(figsize=(3.5, 3.9), layout="constrained")
+    top, bot = fig.subfigures(2, 1, height_ratios=[1, 3.3])
     ax = top.subplots(1, 3)
     for a, N in zip(ax, (128, 1024, 4096)):
         show(a, d[f"text_rec_{N}"], f"$N={N}$")
@@ -226,16 +226,16 @@ def plot_sweep_window_len(d) -> plt.Figure:
     for n in NAMES:
         a.plot(L, 1 - d[f"{n}_image_auc"].mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
         b.plot(L, d[f"{n}_image"].mean(1), color=COLOR[n], marker=MARK[n], label=LABEL[n])
-    b.plot(L, d["text_own"].mean(1), color=COLOR["text"], marker=MARK["text"], ls=":", mfc="white",
-           label="text, own grid")
+    own, = b.plot(L, d["text_own"].mean(1), color=COLOR["text"], marker=MARK["text"], ls=":", mfc="white",
+                  label="text, own grid")
     a.set_yscale("log")
     b.set_xscale("log", base=2)
     b.set_xticks(L, [str(v) for v in L])
     b.minorticks_off()
     a.set(ylabel="$1-$AUC")
-    b.set(xlabel="window length $N$ (hop $N/4$)", ylabel="SSIM")
+    b.set(xlabel="window length $N$ (hop $N/4$)", ylabel="SSIM", ylim=(0.3, 1))
     a.legend(loc="lower center", bbox_to_anchor=(0.5, 1.0), ncols=3)
-    b.legend(loc="lower center", ncols=2)
+    b.legend(handles=[own], loc="lower right")
     return fig
 
 
@@ -318,7 +318,7 @@ def gl_iterations(imgs: dict) -> list:
 
 
 def plot_gl_iterations(d) -> plt.Figure:
-    fig, (a, c, b) = plt.subplots(3, 1, figsize=(3.5, 4.9), sharex=True, layout="constrained")
+    fig, (a, c, b) = plt.subplots(3, 1, figsize=(3.5, 4.0), sharex=True, layout="constrained")
     it = np.arange(CURVE_LEN)
     for n in NAMES:
         a.plot(it + 1, d[f"{n}_errs_random"].mean(0), color=COLOR[n], label=f"{LABEL[n]}, random")
@@ -437,8 +437,8 @@ def noise_robustness(imgs: dict) -> list:
 
 
 def plot_noise_robustness(d) -> plt.Figure:
-    fig = plt.figure(figsize=(3.5, 5.6), layout="constrained")
-    top, bot = fig.subfigures(2, 1, height_ratios=[1, 5.4])
+    fig = plt.figure(figsize=(3.5, 4.5), layout="constrained")
+    top, bot = fig.subfigures(2, 1, height_ratios=[1, 4.4])
     for a, snr in zip(top.subplots(1, 3), (20, 10, 0)):
         show(a, d[f"text_edges_rec_{snr}"], f"{snr} dB")
     a, m, b = bot.subplots(3, 1, sharex=True)
