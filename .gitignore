@@ -29,3 +29,5 @@ recordings/
 # Presentation kit (make_final.sh) and the author's voice recordings
 final/
 video/voice/
+build/
+bin/

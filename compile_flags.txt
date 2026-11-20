@@ -1,0 +1,4 @@
+-std=c++23
+-I/opt/homebrew/include/opencv5
+-I/opt/homebrew/include
+-Icpp
