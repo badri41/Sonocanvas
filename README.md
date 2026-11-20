@@ -29,6 +29,8 @@ commands below. Rendering the video also needs cairo, pango and ffmpeg, and `Mat
 | Paper | `python paper/make_numbers.py && (cd paper && tectonic main.tex)` | also refreshes the table below |
 | Video | `video/render.sh h` | 1080p60 (`m` for 720p30); writes `video/sonocanvas_1080p60.mp4` |
 | Scene timing | `python video/timing.py` | scene lengths from `video/narration.md` |
+| Voiceover | `python video/add_voice.py --prepare`, render, then `python video/add_voice.py` | per-scene files in `video/voice/`; -16 LUFS |
+| Presentation kit | `./make_final.sh` | assembles `final/` |
 | Check a clip | `video/check_scene.sh clip.mp4 sheet.png` | contact sheet and holds over 3 s |
 | Demo | `streamlit run app.py` | add `?present=1` to the URL for presentation mode |
 | Score a recording | `python analyze_recording.py take.m4a --word DA321 --dist 2 --device phone` | see `ACOUSTIC_TEST.md` |

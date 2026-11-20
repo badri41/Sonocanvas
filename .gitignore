@@ -25,3 +25,7 @@ media/
 .DS_Store
 *.mp4
 recordings/
+
+# Presentation kit (make_final.sh) and the author's voice recordings
+final/
+video/voice/
