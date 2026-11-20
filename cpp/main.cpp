@@ -36,6 +36,12 @@ int main(int argc, char** argv) {
     }
 
     sc::Image img = sc::preprocess(image.empty() ? sc::render_text(text, 900, 260, !fixed_font) : sc::load(image), mode);
+    double brightest;
+    cv::minMaxLoc(img, nullptr, &brightest);
+    if (brightest == 0) {
+        std::println(stderr, "the picture has no content to encode (try the other --mode)");
+        return 1;
+    }
     sc::Params p;
     p.dur = image.empty() ? sc::text_duration(img) : 5.0;
 

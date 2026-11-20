@@ -1,7 +1,8 @@
 # SonoCanvas build and pipeline. `make` builds the C++ programs; `make help` lists the targets.
 
-CXX      ?= clang++
-CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Icpp -I/opt/homebrew/include/opencv5 -I/opt/homebrew/include
+CXX      := clang++
+CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Icpp -I/opt/homebrew/include/opencv5 -I/opt/homebrew/include \
+            -DSONOCANVAS_FONT=\"$(CURDIR)/cpp/fonts/DejaVuSans-Bold.ttf\"
 LDLIBS   := -L/opt/homebrew/lib -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_freetype \
             -lopencv_geometry -lsndfile -lz
 PY       := .venv/bin/python
