@@ -30,3 +30,12 @@ def test_presentation_falls_back_to_prerendered_wav(monkeypatch):
     assert not at.exception
     assert "pre-rendered demo/HELLO.wav" in at.caption[-1].value
     assert float(at.metric[0].value) > 0.99
+
+
+def test_keep_font_size_lengthens_clip():
+    at = AppTest.from_file(APP, default_timeout=120).run()
+    at.toggle[1].set_value(True).run()
+    at.text_input[0].set_value("DRAWING WITH SOUND").run()
+    assert not at.exception
+    clip = float(at.caption[-1].value.split("Clip length ")[1].split(" s")[0])
+    assert clip > 10 and float(at.metric[0].value) > 0.99

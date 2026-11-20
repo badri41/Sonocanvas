@@ -1,10 +1,10 @@
-"""CLI: python -m sonocanvas "HELLO" -o hello.wav [--png hello.png] [--mode edges|raw]"""
+"""CLI: python -m sonocanvas "HELLO" -o hello.wav [--png hello.png] [--mode edges|raw] [--fixed-font]"""
 import argparse
 
 import numpy as np
 from scipy.io import wavfile
 
-from . import decode, encode, preprocess, psnr, render_text, ssim
+from . import decode, encode, preprocess, psnr, render_text, ssim, text_duration
 
 
 def figure(target: np.ndarray, rec: np.ndarray, info: dict, s: float, p: float,
@@ -14,7 +14,7 @@ def figure(target: np.ndarray, rec: np.ndarray, info: dict, s: float, p: float,
     import matplotlib.pyplot as plt
 
     ext = [0, dur, f_lo / 1000, f_hi / 1000]
-    fig, ax = plt.subplots(2, 1, figsize=(9, 6.4), sharex=True)
+    fig, ax = plt.subplots(2, 1, figsize=(9 * max(1.0, dur / 5), 6.4), sharex=True)
     ax[0].imshow(target, cmap="magma", aspect="auto", extent=ext)
     ax[0].set_title("target magnitude $S$")
     ax[1].imshow(rec, cmap="magma", aspect="auto", extent=ext)
@@ -34,16 +34,20 @@ def main() -> None:
     ap.add_argument("-o", "--out", required=True, help="output WAV path")
     ap.add_argument("--png", help="optional target-vs-decoded spectrogram image")
     ap.add_argument("--mode", choices=["edges", "raw"], default="edges")
+    ap.add_argument("--fixed-font", action="store_true",
+                    help="keep the full font size for long text and lengthen the audio instead of shrinking the text")
     a = ap.parse_args()
 
-    x, info = encode(preprocess(render_text(a.text), mode=a.mode))
-    rec = decode(x)
+    img = preprocess(render_text(a.text, fit=not a.fixed_font), mode=a.mode)
+    dur = text_duration(img)
+    x, info = encode(img, dur=dur)
+    rec = decode(x, dur=dur)
     s, p = ssim(info["target"], rec), psnr(info["target"], rec)
     wavfile.write(a.out, info["sr"], (x * 32767).astype(np.int16))
     print(f"wrote {a.out} ({len(x) / info['sr']:.2f} s @ {info['sr']} Hz)  "
           f"SSIM={s:.4f}  PSNR={p:.2f} dB  SC={info['errs'][-1]:.4f}")
     if a.png:
-        figure(info["target"], rec, info, s, p).savefig(a.png, dpi=120)
+        figure(info["target"], rec, info, s, p, dur).savefig(a.png, dpi=120)
         print(f"wrote {a.png}")
 
 

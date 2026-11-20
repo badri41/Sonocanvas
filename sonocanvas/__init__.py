@@ -6,13 +6,13 @@ decode: x -> |STFT(x)| on the band -> image on the target grid.
 import numpy as np
 
 from .freq_map import image_to_mag
-from .image_prep import load, preprocess, render_text
+from .image_prep import load, preprocess, render_text, text_duration
 from .metrics import auc, psnr, recover, spectral_convergence, ssim
 from .phase import griffin_lim
 from .stft import istft, stft, window
 from .stft import window as _make_window
 
-__all__ = ["encode", "decode", "load", "render_text", "preprocess", "image_to_mag",
+__all__ = ["encode", "decode", "load", "render_text", "text_duration", "preprocess", "image_to_mag",
            "stft", "istft", "window", "griffin_lim", "recover", "ssim", "psnr",
            "spectral_convergence", "auc"]
 

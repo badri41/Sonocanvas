@@ -15,21 +15,31 @@ def load(path: str) -> np.ndarray:
     return np.asarray(Image.open(path).convert("L"), float) / 255.0
 
 
-def render_text(text: str, w: int = 900, h: int = 260) -> np.ndarray:
-    r"""White bold text (DejaVu Sans Bold, 170 px, smaller if wider than 0.92 w) centred on a black
-    w x h canvas, in [0, 1].
+def render_text(text: str, w: int = 900, h: int = 260, fit: bool = True) -> np.ndarray:
+    r"""White bold text (DejaVu Sans Bold, 170 px) centred on a black w x h canvas, in [0, 1].
 
+    Text wider than 0.92 w is shrunk to fit (fit=True), or the canvas is widened to
+    w' = \lceil (b_2 - b_0)/0.92 \rceil so the font keeps its size (fit=False; encode it with
+    dur = 5 w'/900 s to keep 900 px per 5 s, see text_duration).
     With glyph bbox (b_0, b_1, b_2, b_3): origin = ((w - (b_2 - b_0))/2 - b_0, (h - (b_3 - b_1))/2 - b_1).
     """
+    f = ImageFont.truetype(str(FONT), 170)  # raises if missing; no silent fallback
+    b0, b1, b2, b3 = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), text, font=f)
+    if b2 - b0 > 0.92 * w:
+        if fit:  # shrink long text to fit
+            f = ImageFont.truetype(str(FONT), int(170 * 0.92 * w / (b2 - b0)))
+            b0, b1, b2, b3 = ImageDraw.Draw(Image.new("L", (1, 1))).textbbox((0, 0), text, font=f)
+        else:  # widen the canvas instead
+            w = int(np.ceil((b2 - b0) / 0.92))
     img = Image.new("L", (w, h), 0)
     d = ImageDraw.Draw(img)
-    f = ImageFont.truetype(str(FONT), 170)  # raises if missing; no silent fallback
-    b0, b1, b2, b3 = d.textbbox((0, 0), text, font=f)
-    if b2 - b0 > 0.92 * w:  # shrink long text to fit
-        f = ImageFont.truetype(str(FONT), int(170 * 0.92 * w / (b2 - b0)))
-        b0, b1, b2, b3 = d.textbbox((0, 0), text, font=f)
     d.text(((w - (b2 - b0)) / 2 - b0, (h - (b3 - b1)) / 2 - b1), text, fill=255, font=f)
     return np.asarray(img, float) / 255.0
+
+
+def text_duration(img: np.ndarray, w: int = 900, dur: float = 5.0) -> float:
+    r"""Clip length that keeps a widened text canvas at the default time scale: dur \cdot w'/w seconds."""
+    return dur * max(1.0, img.shape[1] / w)
 
 
 def preprocess(img: np.ndarray, mode: str = "raw", gamma: float = 1.0,

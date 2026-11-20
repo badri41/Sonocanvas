@@ -24,6 +24,7 @@ commands below. Rendering the video also needs cairo, pango and ffmpeg, and `Mat
 |---|---|---|
 | Tests | `python -m pytest -q` | core, metrics and app |
 | Encode a word | `python -m sonocanvas "HELLO" -o hello.wav --png hello.png` | WAV plus target-vs-decoded image |
+| Encode a sentence | `python -m sonocanvas "DRAWING WITH SOUND" -o s.wav --fixed-font` | keeps the 170 px font and lengthens the clip (13.6 s here) instead of shrinking the text |
 | Experiments | `python experiments.py` | six experiments; `gl_iterations` takes hours |
 | Redraw figures | `python experiments.py --plot-only` | from `data/*.npz` |
 | Paper | `python paper/make_numbers.py && (cd paper && tectonic main.tex)` | also refreshes the table below |

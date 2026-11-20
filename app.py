@@ -30,15 +30,15 @@ def scores(target: np.ndarray, rec: np.ndarray) -> dict:
     return {"rec": rec, "auc": sc.auc(target, rec), "ssim": sc.ssim(target, rec), "psnr": sc.psnr(target, rec)}
 
 
-def encode(img: np.ndarray) -> dict:
-    x, info = sc.encode(img)
+def encode(img: np.ndarray, dur: float = 5.0) -> dict:
+    x, info = sc.encode(img, dur=dur)
     return {"wav": wav_bytes(x, info["sr"]), "target": info["target"], "info": info, "sc": info["errs"][-1],
-            "source": "encoded live", **scores(info["target"], sc.decode(x))}
+            "source": "encoded live", **scores(info["target"], sc.decode(x, dur=dur))}
 
 
 @st.cache_data(show_spinner="Running Griffin-Lim...")
-def run(img: np.ndarray) -> dict:
-    return encode(img)
+def run(img: np.ndarray, dur: float = 5.0) -> dict:
+    return encode(img, dur)
 
 
 @st.cache_resource
@@ -89,8 +89,10 @@ for col, word in zip(st.columns(len(PRESETS)), PRESETS):
         st.session_state.text = word
 text = st.text_input("Word", key="text", max_chars=24)
 if present:
-    upload, mode = None, "edges"
+    upload, mode, fixed = None, "edges", False
 else:
+    fixed = st.toggle("Keep font size (longer audio)",
+                      help="Long text normally shrinks to fit 5 s. On, the font stays full size and the clip grows.")
     upload = st.file_uploader("Or upload an image", type=["png", "jpg", "jpeg"])
     mode = st.radio("Preprocessing", ("edges", "raw"), horizontal=True,
                     help="Edges survive best. Raw keeps filled shapes, with visible speckle.")
@@ -99,21 +101,23 @@ if upload is None and not text.strip():
     st.info("Type a word or upload an image.")
     st.stop()
 
-base = sc.load(upload) if upload is not None else sc.render_text(text)
+base = sc.load(upload) if upload is not None else sc.render_text(text, fit=not fixed)
 img = sc.preprocess(base, mode=mode)
+dur = 5.0 if upload is not None else sc.text_duration(img)
 if img.max() == 0:
     st.warning("This image has no content to encode. Try the other preprocessing mode.")
     st.stop()
 
-r = run_presenting(f"{text}|{mode}", text.strip(), img) if present else run(img)
+r = run_presenting(f"{text}|{mode}", text.strip(), img) if present else run(img, dur)
 st.audio(r["wav"], format="audio/wav")
 st.download_button("Download WAV", r["wav"], file_name="sonocanvas.wav", mime="audio/wav")
 c1, c2, c3 = st.columns(3)
 c1.metric("AUC (legibility)", f"{r['auc']:.3f}")
 c2.metric("SSIM", f"{r['ssim']:.3f}")
 c3.metric("PSNR", f"{r['psnr']:.1f} dB")
-fig = figure(r["target"], r["rec"], r["info"], r["ssim"], r["psnr"])
+fig = figure(r["target"], r["rec"], r["info"], r["ssim"], r["psnr"], dur)
 fig.axes[1].set_title(f"decoded from audio: AUC {r['auc']:.3f}, SSIM {r['ssim']:.3f}")
 st.pyplot(fig)
 sc_txt = f", spectral convergence {r['sc']:.3f}" if r["sc"] is not None else ""
-st.caption(f"Source: {r['source']}{sc_txt}. Phone app settings: linear frequency axis, range up to at least 8 kHz.")
+st.caption(f"Source: {r['source']}{sc_txt}. Clip length {dur:.1f} s. Phone app settings: linear frequency axis, "
+           f"range up to at least 8 kHz, time window of at least {dur:.0f} s.")
