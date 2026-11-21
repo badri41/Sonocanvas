@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Image and spectral quality scores.
+The scores: SSIM, PSNR, AUC and spectral convergence.
 */
 #include <algorithm>
 #include <cmath>
@@ -14,10 +14,14 @@ Image and spectral quality scores.
 
 namespace sc {
 
+/*
+   Means, variances and covariance from 7x7 box blurs. The 49/48 turns them into sample
+   (co)variances, which is what scikit-image does too.
+*/
 Image ssim_map(const Image &a, const Image &b)
 {
-    const double C1 = 0.01 * 0.01, C2 = 0.03 * 0.03, n = 49.0 / 48.0;  // n: sample (co)variance
-    auto mean = [](const Image &m) {  // local mean over a 7x7 window
+    const double C1 = 0.01 * 0.01, C2 = 0.03 * 0.03, n = 49.0 / 48.0;
+    auto mean = [](const Image &m) {
         Image out;
         cv::blur(m, out, {7, 7}, {-1, -1}, cv::BORDER_REFLECT);
         return out;
@@ -43,6 +47,11 @@ double psnr(const Image &a, const Image &b)
     return 10 * std::log10(1.0 / mse);
 }
 
+/*
+   Mann-Whitney: rank all pixels of rec (ties get their average rank), add up the ranks of the
+   stroke pixels, and AUC = (rank sum - n1*(n1 + 1)/2) / (n1*n0). Same as comparing every
+   stroke/background pair, but O(n log n) instead of O(n^2).
+*/
 double auc(const Image &target, const Image &rec)
 {
     std::vector<double> t(target.begin(), target.end()), r(rec.begin(), rec.end());
@@ -51,14 +60,14 @@ double auc(const Image &target, const Image &rec)
     std::iota(order.begin(), order.end(), 0);
     std::sort(order.begin(), order.end(), [&](size_t i, size_t j) { return r[i] < r[j]; });
 
-    std::vector<double> rank(n);  // 1-based ranks; tied values share their average rank
+    std::vector<double> rank(n);
     for (size_t i = 0; i < n;) {
         size_t j = i;
         while (j < n && r[order[j]] == r[order[i]]) ++j;
         for (size_t k = i; k < j; ++k) rank[order[k]] = (i + 1 + j) / 2.0;
         i = j;
     }
-    double n1 = 0, sum = 0;  // stroke pixel count and their rank sum
+    double n1 = 0, sum = 0;
     for (size_t i = 0; i < n; ++i)
         if (t[i] > 0.5) {
             ++n1;

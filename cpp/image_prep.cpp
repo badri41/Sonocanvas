@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Image loading, text rendering, preprocessing and anti-aliased resizing.
+Loading images, drawing text, edge detection and resizing.
 */
 #include <cmath>
 #include <stdexcept>
@@ -29,12 +29,15 @@ Image load(const std::string &path)
     return out;
 }
 
-// The text drawn white at `px` pixels, cropped to its ink: the bounding box of non-zero pixels.
+/*
+   Draws the text white at `px` pixels on a big black canvas and crops it to the ink, so we know
+   exactly how wide the letters are. The font is loaded once and kept; it throws if the file is missing.
+*/
 static cv::Mat ink(const std::string &text, int px)
 {
     static cv::Ptr<cv::freetype::FreeType2> ft = [] {
         auto f = cv::freetype::createFreeType2();
-        f->loadFontData(SONOCANVAS_FONT, 0);  // throws if the font is missing
+        f->loadFontData(SONOCANVAS_FONT, 0);
         return f;
     }();
     cv::Mat big = cv::Mat::zeros(2 * px, px * int(text.size() + 2), CV_8U);
@@ -47,8 +50,8 @@ Image render_text(const std::string &text, int w, int h, bool fit)
 {
     cv::Mat t = ink(text, 170);
     if (!t.empty() && t.cols > 0.92 * w) {
-        if (fit) t = ink(text, int(170 * 0.92 * w / t.cols));  // shrink the font
-        else w = int(std::ceil(t.cols / 0.92));                // or widen the canvas
+        if (fit) t = ink(text, int(170 * 0.92 * w / t.cols));
+        else w = int(std::ceil(t.cols / 0.92));
     }
     cv::Mat canvas = cv::Mat::zeros(h, w, CV_8U);
     if (!t.empty()) t.copyTo(canvas(cv::Rect((w - t.cols) / 2, (h - t.rows) / 2, t.cols, t.rows)));
@@ -62,10 +65,13 @@ double text_duration(const Image &img, int w, double dur)
     return dur * std::max(1.0, double(img.cols) / w);
 }
 
+/*
+   A flat image normalises to all zeros, which main() then rejects as "nothing to encode".
+*/
 Image preprocess(const Image &img, const std::string &mode, double gamma, int dilate)
 {
     Image out;
-    cv::normalize(img, out, 0, 1, cv::NORM_MINMAX);  // a constant image becomes all zeros
+    cv::normalize(img, out, 0, 1, cv::NORM_MINMAX);
     cv::pow(out, gamma, out);
     if (mode == "raw") return out;
     if (mode != "edges") throw std::invalid_argument("unknown mode " + mode);
@@ -76,13 +82,15 @@ Image preprocess(const Image &img, const std::string &mode, double gamma, int di
     cv::magnitude(gx, gy, g);
     double gmax;
     cv::minMaxLoc(g, nullptr, &gmax);
-    cv::Mat edges = g > 0.25 * gmax;  // 0 or 255
+    cv::Mat edges = g > 0.25 * gmax;
     if (dilate > 0) cv::dilate(edges, edges, cv::getStructuringElement(cv::MORPH_CROSS, {3, 3}), {-1, -1}, dilate);
     edges.convertTo(out, CV_64F, 1.0 / 255);
     return out;
 }
 
-// 1-D Gaussian kernel with radius floor(4*sigma + 1/2); the identity when sigma = 0.
+/*
+   1-D Gaussian kernel, radius floor(4*sigma + 1/2). sigma = 0 means no blur at all.
+*/
 static cv::Mat gaussian(double sigma)
 {
     if (sigma <= 0) return cv::Mat::ones(1, 1, CV_64F);

@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-WAV files (libsndfile), answer-key figures (OpenCV) and .npz files (cnpy).
+Files: WAV through libsndfile, the answer-key PNG through OpenCV, .npz through cnpy.
 */
 #include <stdexcept>
 
@@ -23,7 +23,7 @@ void write_wav(const std::string &path, const Signal &x, int sr)
     info.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
     SNDFILE *f = sf_open(path.c_str(), SFM_WRITE, &info);
     if (!f) throw std::runtime_error("cannot write " + path + ": " + sf_strerror(nullptr));
-    sf_write_double(f, x.data(), sf_count_t(x.size()));  // [-1, 1] -> 16-bit
+    sf_write_double(f, x.data(), sf_count_t(x.size()));
     sf_close(f);
 }
 
@@ -35,14 +35,17 @@ Signal read_wav(const std::string &path, int *sr)
     std::vector<double> frames(size_t(info.frames) * info.channels);
     sf_readf_double(f, frames.data(), info.frames);
     sf_close(f);
-    Signal x(info.frames, 0.0);  // average the channels
+    Signal x(info.frames, 0.0);
     for (sf_count_t i = 0; i < info.frames; ++i)
         for (int c = 0; c < info.channels; ++c) x[i] += frames[i * info.channels + c] / info.channels;
     *sr = info.samplerate;
     return x;
 }
 
-// One titled panel: the image in the magma colour map, 900 px wide per 5 s of a 260 px tall picture.
+/*
+   One panel of the answer key: the image in magma with a title above it.
+   900 px wide for 5 s of audio, wider for longer clips.
+*/
 static cv::Mat panel(const Image &img, const std::string &title)
 {
     int w = std::max(900, int(900.0 * img.cols / 431)), h = 300;
@@ -64,18 +67,24 @@ void save_figure(const std::string &path, const Image &target, const Image &rec,
     if (!cv::imwrite(path, fig)) throw std::runtime_error("cannot write " + path);
 }
 
+/*
+   The first array creates the file ("w"), every one after that appends ("a").
+*/
 std::string Npz::mode()
 {
-    std::string m = first_ ? "w" : "a";  // the first array creates the file, the rest append
+    std::string m = first_ ? "w" : "a";
     first_ = false;
     return m;
 }
 
+/*
+   cnpy wants one continuous block of floats, hence the clone.
+*/
 void Npz::add(const std::string &name, const Image &m)
 {
     cv::Mat f;
     m.convertTo(f, CV_32F);
-    f = f.clone();  // continuous
+    f = f.clone();
     cnpy::npz_save(path_, name, f.ptr<float>(), {size_t(f.rows), size_t(f.cols)}, mode());
 }
 

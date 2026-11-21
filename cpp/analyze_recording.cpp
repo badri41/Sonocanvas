@@ -2,16 +2,17 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Score a real recording of a demo WAV: align it, decode it, and report AUC and SSIM.
+You played a demo WAV through a speaker and recorded it. This tells you how much survived.
 
   bin/analyze_recording take.m4a --word DA321 --dist 2 --device phone [--take 1] [--video]
 
-Any format ffmpeg reads (a phone's .m4a, a .wav) is converted to 22050 Hz mono first. Writes a row
-to results/acoustic.csv (re-running a take replaces its row), the image to figures/acoustic/, and
-with --video also data/acoustic_video.npz for scene 7.
+Anything ffmpeg can read works (a phone .m4a, a .wav), it gets converted to 22050 Hz mono first.
+It writes a row to results/acoustic.csv (run the same take again and the row gets replaced), the
+picture to figures/acoustic/, and with --video also data/acoustic_video.npz for scene 7.
 
-Alignment: the delay is the peak of the cross-correlation of the band-limited recording with the
-encoded signal, d* = argmax_d |sum_n r[n+d]*x[n]|. decode() then sees exactly the clip.
+The recording starts at some random moment, so first we find where the clip is: slide the clip
+along the recording and take the shift where they match best, d* = argmax_d |sum_n r[n+d]*x[n]|.
+Then decode() sees exactly the clip.
 */
 #include <algorithm>
 #include <cmath>
@@ -30,9 +31,11 @@ encoded signal, d* = argmax_d |sum_n r[n+d]*x[n]|. decode() then sees exactly th
 using namespace sc;
 constexpr int SR = 22050;
 constexpr double F_LO = 1000, F_HI = 8000;
-constexpr double MIN_PEAK_RATIO = 40;  // correct takes gave 130-158 in simulation, the wrong word 19
+constexpr double MIN_PEAK_RATIO = 40;  // right word gave 130-158 in simulation, wrong word 19
 
-// The recording as 22050 Hz mono, peak-normalised to 1, via ffmpeg.
+/*
+   Lets ffmpeg turn the recording into a 22050 Hz mono WAV, reads it, and scales the peak to 1.
+*/
 Signal read_audio(const std::string &path)
 {
     std::string tmp = (std::filesystem::temp_directory_path() / "sonocanvas_take.wav").string();
@@ -47,21 +50,26 @@ Signal read_audio(const std::string &path)
     return r;
 }
 
-// Keep only F_LO..F_HI: zero every other DFT bin of the whole signal and transform back.
+/*
+   Throws away everything outside F_LO..F_HI (room hum, voices) by zeroing those DFT bins of the
+   whole recording. Bins above L/2 are the negative frequencies, hence the min(k, L - k).
+*/
 Signal bandpass(const Signal &r)
 {
     cv::Mat x(1, int(r.size()), CV_64F, const_cast<double *>(r.data())), X, y;
     cv::dft(x, X, cv::DFT_COMPLEX_OUTPUT);
     int L = int(r.size());
     for (int k = 0; k < L; ++k) {
-        double f = std::min(k, L - k) * double(SR) / L;  // bins above L/2 are negative frequencies
+        double f = std::min(k, L - k) * double(SR) / L;
         if (f < F_LO || f > F_HI) X.at<cv::Vec2d>(0, k) = {0, 0};
     }
     cv::dft(X, y, cv::DFT_INVERSE | cv::DFT_SCALE | cv::DFT_REAL_OUTPUT);
     return Signal(y.ptr<double>(), y.ptr<double>() + L);
 }
 
-// |cross-correlation| of r with x at every delay where x fits inside r.
+/*
+   |cross-correlation| of r with x for every shift where x still fits inside r.
+*/
 std::vector<float> correlate(const Signal &r, const Signal &x)
 {
     cv::Mat rf, xf, c;
@@ -72,10 +80,13 @@ std::vector<float> correlate(const Signal &r, const Signal &x)
     return std::vector<float>(c.ptr<float>(), c.ptr<float>() + c.cols);
 }
 
-// In-band SNR from the room noise before and after the clip: 10*log10(P_clip/P_noise - 1).
+/*
+   In-band SNR. The bits before and after the clip are just the room, so they tell us the noise:
+   10*log10(P_clip/P_noise - 1). We skip 0.1 s around the clip so its edges do not count as noise.
+*/
 double snr_db(const Signal &b, size_t d, size_t n)
 {
-    size_t guard = SR / 10;  // skip the clip's onset and any tail
+    size_t guard = SR / 10;
     double clip = 0, noise = 0;
     size_t quiet = 0;
     for (size_t i = d; i < d + n; ++i) clip += b[i] * b[i];
@@ -85,14 +96,17 @@ double snr_db(const Signal &b, size_t d, size_t n)
     return 10 * std::log10(std::max((clip / n) / (noise / quiet) - 1, 1e-6));
 }
 
-// Add or replace this take's row in results/acoustic.csv, sorted by word, distance, device, take.
+/*
+   Puts this take's row into results/acoustic.csv (replacing the old one if it is there),
+   sorted by word, distance, device, take.
+*/
 void save_row(const std::vector<std::string> &row)
 {
     const std::string path = "results/acoustic.csv";
     std::vector<std::vector<std::string>> rows;
     std::ifstream in(path);
     std::string line;
-    std::getline(in, line);  // header
+    std::getline(in, line);
     while (std::getline(in, line)) {
         std::vector<std::string> f;
         std::stringstream ss(line);
@@ -129,7 +143,7 @@ int main(int argc, char **argv)
     app.add_flag("--video", video, "use this take in scene 7 of the video");
     CLI11_PARSE(app, argc, argv);
 
-    Encoded e = encode(preprocess(render_text(word), "edges"));  // exactly the WAVs in demo/
+    Encoded e = encode(preprocess(render_text(word), "edges"));
     Signal r = read_audio(recording);
     if (r.size() < e.x.size()) {
         std::println(stderr, "recording is {:.1f} s but the clip is {:.1f} s: it cannot contain it",
@@ -141,7 +155,7 @@ int main(int argc, char **argv)
     size_t d = std::max_element(c.begin(), c.end()) - c.begin();
     std::vector<float> sorted = c;
     std::nth_element(sorted.begin(), sorted.begin() + sorted.size() / 2, sorted.end());
-    double ratio = c[d] / sorted[sorted.size() / 2];  // peak over median
+    double ratio = c[d] / sorted[sorted.size() / 2];
     if (ratio < MIN_PEAK_RATIO)
         std::println("WARNING: weak correlation peak (ratio {:.1f} < {}). Check that the word and file match; "
                      "these scores may be meaningless.",

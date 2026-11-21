@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Map an image onto a target STFT magnitude.
+Picture -> target magnitude.
 */
 #include <cmath>
 #include <stdexcept>
@@ -16,7 +16,9 @@ double mel(double f)
     return 2595 * std::log10(1 + f / 700);
 }
 
-// Normalised position of frequency f between f_lo (0) and f_hi (1) on the chosen axis.
+/*
+   Where frequency f sits between f_lo (0) and f_hi (1), on a linear or a mel axis.
+*/
 static double position(double f, const Params &p)
 {
     if (p.scale == "mel") return (mel(f) - mel(p.f_lo)) / (mel(p.f_hi) - mel(p.f_lo));
@@ -37,15 +39,18 @@ cv::Range band(const Params &p)
     return {first, last + 1};
 }
 
+/*
+   We flip the picture first so row 0 is the lowest frequency, same as the bins.
+*/
 Image image_to_mag(const Image &img, const Params &p)
 {
     Image im = resize(img, img.rows, p.frames());
-    cv::flip(im, im, 0);  // row 0 is now the lowest frequency
+    cv::flip(im, im, 0);
 
     Image S = Image::zeros(p.n_fft / 2 + 1, p.frames());
     cv::Range b = band(p);
     for (int k = b.start; k < b.end; ++k) {
-        double r = position(k * double(p.sr) / p.n_fft, p) * (im.rows - 1);  // fractional image row
+        double r = position(k * double(p.sr) / p.n_fft, p) * (im.rows - 1);
         int r0 = std::min(int(r), im.rows - 2);
         double t = r - r0;
         cv::Mat dst = S.row(k);

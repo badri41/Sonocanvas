@@ -18,7 +18,7 @@ def test_presentation_mode_shows_auc_and_presets():
     at.toggle[0].set_value(True).run()
     assert not at.exception
     assert at.metric[0].label.startswith("AUC") and float(at.metric[0].value) > 0.99
-    assert not at.file_uploader and not at.radio  # presets and a word only
+    assert not at.file_uploader and not at.radio
     assert [b.label for b in at.button[:3]] == ["DA321", "HELLO", "IITG"]
 
 
@@ -26,7 +26,8 @@ def test_presentation_falls_back_to_prerendered_wav(monkeypatch):
     monkeypatch.setenv("SONOCANVAS_FALLBACK_S", "0")
     at = AppTest.from_file(APP, default_timeout=60).run()
     at.toggle[0].set_value(True).run()
-    at.button[1].click().run()  # HELLO: not yet encoded in this process, so the timeout fires
+    # NOTE: HELLO wasn't encoded yet in this process, so the timeout fires and we get the fallback.
+    at.button[1].click().run()
     assert not at.exception
     assert "pre-rendered demo/HELLO.wav" in at.caption[-1].value
     assert float(at.metric[0].value) > 0.99

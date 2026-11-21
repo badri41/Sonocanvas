@@ -2,18 +2,18 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-The six controlled experiments of the paper.
+The six experiments from the paper.
 
   bin/experiments                     # all six
   bin/experiments noise_robustness    # one (or several) by name
 
-Each experiment writes data/<name>.npz (read by plots.py and paper/make_numbers) and replaces its
+Every experiment writes data/<name>.npz (plots.py and make_numbers read those) and replaces its own
 rows in results/table.csv: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR.
-Means and population standard deviations are over five seeds (Griffin-Lim or noise seeds).
+Every number is a mean (and std) over five seeds, so one lucky run can't fool us.
 
-Test images: text = render_text("DA321"); line = the CC0 horse silhouette, whose edges form the
-line drawing; photo = the CC0 cat (data/images/). Unless an experiment varies it, text and line use
-mode "edges" and photo uses "raw".
+Three test pictures: text is DA321, line is the horse silhouette (its edges make a line drawing),
+photo is Chelsea the cat. Both images are CC0 and live in data/images/. Text and line go in as
+"edges", the photo as "raw", unless the experiment is about exactly that.
 */
 #include <chrono>
 #include <cmath>
@@ -41,8 +41,6 @@ const std::map<std::string, std::string> MODE = {{"text", "edges"}, {"line", "ed
 constexpr int SR = 22050;
 constexpr double F_LO = 1000, F_HI = 8000, C1 = 0.01 * 0.01, C2 = 0.03 * 0.03;
 
-// helpers
-
 double mean(const std::vector<double> &v)
 {
     double s = 0;
@@ -50,26 +48,36 @@ double mean(const std::vector<double> &v)
     return s / v.size();
 }
 
+/*
+   Population std, so we divide by n and not n - 1.
+*/
 double stdev(const std::vector<double> &v)
-{  // population standard deviation
+{
     double m = mean(v), s = 0;
     for (double x : v) s += (x - m) * (x - m);
     return std::sqrt(s / v.size());
 }
 
-// Mean of m over the pixels where mask is non-zero; NaN when there are none.
+/*
+   Mean of m over the pixels where mask is on. NaN if the mask is empty.
+*/
 double masked_mean(const Image &m, const cv::Mat &mask)
 {
     return cv::countNonZero(mask) ? cv::mean(m, mask)[0] : NAN;
 }
 
+/*
+   Clamps every pixel to [0, 1].
+*/
 Image clip01(const Image &m)
 {
     Image out = cv::max(cv::min(m, 1.0), 0.0);
     return out;
 }
 
-// Rows of equal length, flattened, with their shape: for 2-D arrays in the .npz.
+/*
+   A 2-D table flattened into one vector plus its shape, because that's what Npz::add wants.
+*/
 struct Table_2D {
     std::vector<double> data;
     std::vector<size_t> shape;
@@ -81,6 +89,9 @@ Table_2D stack(const std::vector<std::vector<double>> &rows)
     return t;
 }
 
+/*
+   One line of results/table.csv: means and stds over the seeds, AUC and SSIM to 4 places.
+*/
 Row row(const std::string &exp, const std::string &image, const std::string &param, const std::vector<double> &ssims,
         const std::vector<double> &psnrs, const std::vector<double> &aucs)
 {
@@ -94,6 +105,9 @@ Row row(const std::string &exp, const std::string &image, const std::string &par
             std::format("{:.2f}", mean(psnrs))};
 }
 
+/*
+   The three test pictures, before any preprocessing.
+*/
 std::map<std::string, Image> base_images()
 {
     return {{"text", render_text("DA321")},
@@ -101,8 +115,6 @@ std::map<std::string, Image> base_images()
             {"photo", load("data/images/chelsea.png")}};
 }
 
-// Encode and decode once per seed. Each reference image also scores the decoded image resized onto
-// its grid. Seed 0's waveform, target and decoded image are kept.
 struct Scores {
     std::vector<double> ssim, psnr, auc;
 };
@@ -114,6 +126,10 @@ struct Trial {
     Image rec;                              // seed 0
 };
 
+/*
+   Encode and decode once per seed and score it. If you pass reference images, the decoded picture
+   also gets resized onto each of their grids and scored there. We keep seed 0's stuff for the plots.
+*/
 Trial trial(const Image &img, const Params &p = {}, int n_iter = 60, const std::string &init = "random",
             const std::vector<unsigned> &seeds = SEEDS, const std::map<std::string, Image> &refs = {})
 {
@@ -139,9 +155,15 @@ Trial trial(const Image &img, const Params &p = {}, int n_iter = 60, const std::
     return t;
 }
 
-// What SSIM does over flat target regions: 7x7 windows with sigma_T^2 < C2 (border excluded).
-// frac: share of such windows. var: mean sigma_R^2. lum: mean luminance term l. ssim, rest: mean SSIM
-// map on and off them. pred: mean of l*C2/(sigma_R^2 + C2), the flat-target approximation.
+/*
+   What SSIM does on the flat parts of the target (7x7 windows with sigma_T^2 < C2, border skipped).
+   There the target has no texture, so any speckle in rec gets punished hard.
+     flat_frac   how many windows are flat
+     flat_var    mean sigma_R^2 of rec on them
+     flat_lum    mean luminance term l on them
+     flat_ssim   mean SSIM on them, rest_ssim on everything else
+     flat_pred   mean of l*C2/(sigma_R^2 + C2), which is what SSIM should be on a flat target
+*/
 std::map<std::string, double> flat_stats(const Image &target, const Image &rec)
 {
     Image smap = ssim_map(target, rec);
@@ -165,13 +187,15 @@ std::map<std::string, double> flat_stats(const Image &target, const Image &rec)
             {"flat_pred", masked_mean(pred, flat)}};
 }
 
-// Separates what SSIM measures on a decoded image.
-//   support: mean SSIM map over the target's lit pixels dilated by 3 (excludes black background).
-//   ls_gain: SSIM after the least-squares gain g = <T,R>/<R,R>, undoing the max-normalisation bias.
-//   cv: sigma/mu of the decoded image on pixels with T > 0.5 (speckle strength).
-//   interior: mean SSIM map where the whole 7x7 window is lit (sigma_T ~ 0). There
-//   SSIM ~ l*C2/(sigma_R^2 + C2); interior_pred evaluates that from the measured mu_R, sigma_R.
-//   NaN when no such window exists (thin edges).
+/*
+   Pulls apart what SSIM is actually measuring on a decoded picture.
+     support        mean SSIM on the lit pixels grown by 3, so the black background doesn't count
+     ls_gain        SSIM after the best gain g = <T,R>/<R,R>, undoing the scale from dividing by max
+     cv             sigma/mu of rec where the target is lit, i.e. how strong the speckle is
+     interior       mean SSIM where the whole 7x7 window is lit (sigma_T ~ 0)
+     interior_pred  l*C2/(sigma_R^2 + C2) from the measured mu_R, sigma_R, the prediction for interior
+   Thin edges have no fully lit window, so interior is NaN for them.
+*/
 std::map<std::string, double> diagnostics(const Image &target, const Image &rec)
 {
     Image smap = ssim_map(target, rec);
@@ -199,8 +223,9 @@ std::map<std::string, double> diagnostics(const Image &target, const Image &rec)
             {"support_frac", cv::countNonZero(sup) / n}};
 }
 
-// 1. edges vs filled
-
+/*
+   Experiment 1: the filled picture vs only its edges.
+*/
 std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
@@ -210,7 +235,7 @@ std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
             Trial t = trial(preprocess(imgs[n], mode));
             rows.push_back(row("edges_vs_filled", n, mode, t.own.ssim, t.own.psnr, t.own.auc));
             auto d = diagnostics(t.first.target, t.rec);
-            for (std::string k : {"support", "ls_gain", "interior", "interior_pred"})  // seed 0 only
+            for (std::string k : {"support", "ls_gain", "interior", "interior_pred"})
                 if (std::isfinite(d[k]))
                     rows.push_back({"edges_vs_filled", n, mode + "/" + k, "", "", std::format("{:.4f}", d[k]), "", ""});
             std::string key = n + "_" + mode + "_";
@@ -226,13 +251,13 @@ std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// 2. window length
-// Own-grid SSIM scores each N against a different target, so it is not comparable across N. The
-// image-grid score compares every decoded image with the original on one fixed grid; "half" repeats
-// this at half resolution to show that the ranking does not depend on the grid.
-
 const std::vector<int> LENGTHS = {128, 256, 512, 1024, 2048, 4096};
 
+/*
+   Experiment 2: window length N. Careful here: every N makes a different target grid, so "own"
+   scores can't be compared across N. "image" scores every result against the original picture on
+   one fixed grid, and "half" does the same at half size to show the ranking doesn't depend on the grid.
+*/
 std::vector<Row> sweep_window_len(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
@@ -269,15 +294,16 @@ std::vector<Row> sweep_window_len(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// 3. window shape
-
 const std::vector<std::string> WINDOWS = {"rect", "hann", "hamming", "blackman"};
 
-// |W(f)| in dB relative to its peak on bins [0, 12) at 1/pad resolution, and the highest sidelobe (dB).
 struct Window_Spectrum {
     std::vector<double> bins, db;
     double sidelobe;
 };
+/*
+   What the window looks like in frequency: |W(f)| in dB, zero padded 32x so we see the lobes,
+   for bins 0..12. Also the highest sidelobe, i.e. how much a pixel leaks into its neighbours.
+*/
 Window_Spectrum window_spectrum(const std::string &name, int N = 1024, int pad = 32)
 {
     cv::Mat w = cv::Mat::zeros(1, N * pad, CV_64F), F;
@@ -289,7 +315,8 @@ Window_Spectrum window_spectrum(const std::string &name, int N = 1024, int pad =
         mag[k] = std::abs(std::complex<double>(F.at<cv::Vec2d>(0, k)[0], F.at<cv::Vec2d>(0, k)[1]));
     double peak = *std::max_element(mag.begin(), mag.end());
     for (size_t k = 0; k < mag.size(); ++k) db[k] = 20 * std::log10(std::max(mag[k] / peak, 1e-8));
-    size_t first_null = 0;  // end of the main lobe: the first bin where the response rises again
+    // NOTE: the main lobe ends where the response starts going up again.
+    size_t first_null = 0;
     while (first_null + 1 < db.size() && !(db[first_null + 1] > db[first_null])) ++first_null;
     if (first_null + 1 == db.size()) first_null = 0;
     Window_Spectrum ws{{}, {}, *std::max_element(db.begin() + first_null, db.end())};
@@ -300,6 +327,9 @@ Window_Spectrum window_spectrum(const std::string &name, int N = 1024, int pad =
     return ws;
 }
 
+/*
+   Experiment 3: window shape, rect vs hann vs hamming vs blackman.
+*/
 std::vector<Row> sweep_window_type(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
@@ -323,12 +353,13 @@ std::vector<Row> sweep_window_type(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// 4. Griffin-Lim iterations
-// n_iter = 0 is random phase only: x = ISTFT(S*exp(j*phi)), with no projection step.
-
 const std::vector<int> ITERS = {0, 1, 2, 5, 10, 20, 60, 100, 200};
 constexpr int CURVE_LEN = 201;  // errs[i] is the error of X_i, so i = 0..200 needs 201 passes
 
+/*
+   Experiment 4: how many Griffin-Lim iterations do we need? n_iter = 0 is just random phase,
+   x = ISTFT(S*exp(j*phi)) with no fixing at all.
+*/
 std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
@@ -360,34 +391,40 @@ std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// 5. mel vs linear
-
-// f(m) = 700*(10^(m/2595) - 1), the inverse of mel()
+/*
+   mel back to Hz: f(m) = 700*(10^(m/2595) - 1).
+*/
 double mel_inv(double m)
 {
     return 700 * (std::pow(10.0, m / 2595) - 1);
 }
 
-// Redraw a bins x frames decoded image on a viewer axis: viewer row r in [0,1] (bottom to top) shows
-// frequency f(r), linearly interpolated between the band's bins (edge values held outside).
+/*
+   Redraws a decoded picture the way a spectrogram app with a linear or mel axis would show it.
+   Row r (0 at the bottom, 1 at the top) shows frequency f(r), interpolated between the band's bins.
+*/
 Image view(const Image &rec, const std::string &scale, int n_fft = 1024)
 {
-    double df = double(SR) / n_fft, f0 = std::ceil(F_LO / df) * df;  // first band bin
+    double df = double(SR) / n_fft, f0 = std::ceil(F_LO / df) * df;
     Image out(rec.size());
     int R = rec.rows;
     for (int i = 0; i < R; ++i) {
         double r = double(i) / (R - 1);
         double f = scale == "mel" ? mel_inv(mel(F_LO) + r * (mel(F_HI) - mel(F_LO))) : F_LO + r * (F_HI - F_LO);
-        double q = std::clamp((f - f0) / df, 0.0, double(R - 1));  // fractional bin, bottom = 0
+        double q = std::clamp((f - f0) / df, 0.0, double(R - 1));
         int q0 = std::min(int(q), R - 2);
         double t = q - q0;
-        // rec row 0 is the top (highest bin), so bin b sits at rec row R-1-b
+        // NOTE: rec row 0 is the top (highest bin), so bin b is rec row R-1-b.
         cv::Mat dst = out.row(R - 1 - i);
         cv::addWeighted(rec.row(R - 1 - q0), 1 - t, rec.row(R - 2 - q0), t, 0, dst);
     }
     return clip01(out);
 }
 
+/*
+   Experiment 5: encode on a linear or mel axis, then look at it on a linear or mel axis.
+   Shows what goes wrong when the encoder and the app don't agree.
+*/
 std::vector<Row> mel_vs_linear(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
@@ -415,13 +452,11 @@ std::vector<Row> mel_vs_linear(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// 6. noise
-// SNR = 10*log10(sum x^2 / sum n^2). Relative noise holds SNR fixed per signal. A loudspeaker
-// instead fixes peak amplitude and the room fixes the noise floor, so for text the "floor" series
-// gives raw and edges the same absolute sigma, chosen so that raw sits at the nominal SNR.
-
 const std::vector<int> SNRS = {30, 20, 10, 5, 0};
 
+/*
+   Noise std that gives this SNR for x. SNR = 10*log10(sum x^2 / sum n^2).
+*/
 double sigma_for(const Signal &x, double snr)
 {
     double p = 0;
@@ -429,6 +464,9 @@ double sigma_for(const Signal &x, double snr)
     return std::sqrt(p / x.size() / std::pow(10.0, snr / 10));
 }
 
+/*
+   x plus white Gaussian noise with std sigma. Seeded, so every run gets the same noise.
+*/
 Signal noisy(const Signal &x, double sigma, unsigned seed)
 {
     std::mt19937 rng(seed);
@@ -438,6 +476,9 @@ Signal noisy(const Signal &x, double sigma, unsigned seed)
     return y;
 }
 
+/*
+   Adds noise five times (seeds 100..104), decodes each one and scores it.
+*/
 Scores noisy_scores(const Signal &x, const Image &target, double sigma)
 {
     Scores s;
@@ -450,12 +491,17 @@ Scores noisy_scores(const Signal &x, const Image &target, double sigma)
     return s;
 }
 
+/*
+   Experiment 6: add white noise and decode. "snr" keeps the SNR fixed for each signal. But a real
+   speaker fixes the peak and the room fixes the noise, so "floor" gives text raw and edges the
+   same noise sigma (set so raw sits at the given SNR). That's the fair comparison.
+*/
 std::vector<Row> noise_robustness(std::map<std::string, Image> &imgs)
 {
     std::vector<Row> rows;
     Npz out("data/noise_robustness.npz");
     out.add("snrs", SNRS);
-    std::map<std::string, Encoded> enc;  // key "image/mode"
+    std::map<std::string, Encoded> enc;
     for (const auto &n : NAMES)
         for (std::string mode : {"raw", "edges"}) enc[n + "/" + mode] = encode(preprocess(imgs[n], mode));
     auto series = [&](const std::string &n, const std::string &mode, const Signal &level_of, const std::string &tag,
@@ -483,14 +529,15 @@ std::vector<Row> noise_robustness(std::map<std::string, Image> &imgs)
     return rows;
 }
 
-// table and main
-
 using Experiment = std::function<std::vector<Row>(std::map<std::string, Image> &)>;
 const std::vector<std::pair<std::string, Experiment>> EXPERIMENTS = {
     {"edges_vs_filled", edges_vs_filled},     {"sweep_window_len", sweep_window_len},
     {"sweep_window_type", sweep_window_type}, {"gl_iterations", gl_iterations},
     {"mel_vs_linear", mel_vs_linear},         {"noise_robustness", noise_robustness}};
 
+/*
+   Splits a CSV line on commas, keeping an empty last field.
+*/
 std::vector<std::string> split(const std::string &line)
 {
     std::vector<std::string> f;
@@ -500,14 +547,16 @@ std::vector<std::string> split(const std::string &line)
     return f;
 }
 
-// Replace the rows of the experiments just run, keeping the file in experiment order.
+/*
+   Swaps in the rows of the experiments we just ran and keeps the rest, in experiment order.
+*/
 void update_table(const std::map<std::string, std::vector<Row>> &fresh)
 {
     const std::string path = "results/table.csv";
     std::vector<Row> rows;
     std::ifstream in(path);
     std::string line;
-    std::getline(in, line);  // header
+    std::getline(in, line);
     while (std::getline(in, line))
         if (Row r = split(line); !r.empty() && !fresh.contains(r[0])) rows.push_back(r);
     for (const auto &[name, rs] : fresh) rows.insert(rows.end(), rs.begin(), rs.end());

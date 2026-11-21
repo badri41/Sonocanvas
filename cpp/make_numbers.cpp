@@ -2,11 +2,12 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Generate paper/numbers.tex, paper/table1.tex, paper/acoustic.tex and the README results table from
-results/table.csv and the .npz files in data/. Every result in main.tex is a macro defined here.
+Writes paper/numbers.tex, paper/table1.tex, paper/acoustic.tex and the README results table, all
+from results/table.csv and the .npz files in data/. Every number in main.tex is a macro made here,
+so nobody ever types a result by hand.
 
-Rounding is half-up on the shortest decimal form of each value (0.9135 -> 0.914), so a printed
-number never depends on binary floating-point noise.
+Rounding is half-up on the shortest decimal form (0.9135 -> 0.914). Rounding the double itself
+would sometimes go the wrong way, because 0.9135 is really 0.91349999... in binary.
 */
 #include <algorithm>
 #include <charconv>
@@ -24,11 +25,12 @@ number never depends on binary floating-point noise.
 
 using Fields = std::map<std::string, std::string>;
 
-// reading
-
+/*
+   Splits a CSV line on commas. Also eats a trailing \r in case the file has \r\n line endings.
+*/
 std::vector<std::string> split(std::string line)
 {
-    if (!line.empty() && line.back() == '\r') line.pop_back();  // files written with \r\n endings
+    if (!line.empty() && line.back() == '\r') line.pop_back();
     std::vector<std::string> f;
     std::stringstream ss(line);
     for (std::string x; std::getline(ss, x, ',');) f.push_back(x);
@@ -36,6 +38,9 @@ std::vector<std::string> split(std::string line)
     return f;
 }
 
+/*
+   Reads a CSV with a header into one map per row: column name -> value.
+*/
 std::vector<Fields> read_csv(const std::string &path)
 {
     std::ifstream in(path);
@@ -52,7 +57,10 @@ std::vector<Fields> read_csv(const std::string &path)
     return rows;
 }
 
-struct Npz {  // read access to one .npz file
+/*
+   Reading side of an .npz. at() throws with the name of the array if it's missing.
+*/
+struct Npz {
     cnpy::npz_t arrays;
     explicit Npz(const std::string &path) : arrays(cnpy::npz_load(path)) {}
     const cnpy::NpyArray &at(const std::string &key) const
@@ -68,7 +76,9 @@ struct Npz {  // read access to one .npz file
         return {a.data<double>(), a.data<double>() + a.num_vals};
     }
     double operator[](const std::string &key) const { return vec(key).at(0); }
-    // Column mean of a 2-D array (rows x cols): the mean over rows, as numpy's .mean(0).
+    /*
+       Column mean of a 2-D array, like numpy's .mean(0).
+    */
     std::vector<double> mean0(const std::string &key) const
     {
         const cnpy::NpyArray &a = at(key);
@@ -79,9 +89,9 @@ struct Npz {  // read access to one .npz file
     }
 };
 
-// decimal rounding
-
-// The shortest decimal string that reads back as x, in fixed notation (what Python's str gives).
+/*
+   The shortest decimal string that reads back as exactly x. Same thing Python's str() gives you.
+*/
 std::string shortest(double x)
 {
     char buf[64];
@@ -89,7 +99,10 @@ std::string shortest(double x)
     return std::string(buf, end);
 }
 
-// Round a decimal string to `places` digits, halves away from zero.
+/*
+   Rounds a decimal string to `places` digits, halves go away from zero. Works on the digits
+   directly, carrying 9s by hand, so no floating point is involved.
+*/
 std::string rnd(const std::string &s, int places = 3)
 {
     bool neg = !s.empty() && s[0] == '-';
@@ -98,7 +111,7 @@ std::string rnd(const std::string &s, int places = 3)
     std::string ip = t.substr(0, dot), fp = dot == std::string::npos ? "" : t.substr(dot + 1);
     fp.resize(places + 1, '0');
     std::string digits = ip + fp.substr(0, places);
-    if (fp[places] >= '5') {  // carry
+    if (fp[places] >= '5') {
         int i = int(digits.size()) - 1;
         while (i >= 0 && digits[i] == '9') digits[i--] = '0';
         if (i < 0) digits.insert(digits.begin(), '1');
@@ -113,7 +126,9 @@ std::string rnd(double x, int places = 3)
     return rnd(shortest(x), places);
 }
 
-// a - b for two decimal strings with four places (exact, in units of 10^-4).
+/*
+   a - b for two decimal strings with four places, done exactly in units of 10^-4.
+*/
 std::string sub4(const std::string &a, const std::string &b)
 {
     auto units = [](std::string s) {
@@ -126,13 +141,16 @@ std::string sub4(const std::string &a, const std::string &b)
     return std::format("{}{}.{:04}", sign, d / 10000, d % 10000);
 }
 
-// the results table
-
 std::map<std::string, Fields> R;  // key "experiment|image|param"
 const std::map<char, std::string> EXP = {{'e', "edges_vs_filled"},   {'n', "sweep_window_len"},
                                          {'w', "sweep_window_type"}, {'g', "gl_iterations"},
                                          {'m', "mel_vs_linear"},     {'s', "noise_robustness"}};
 
+/*
+   One cell of the results table. e is a one letter code for the experiment (see EXP).
+   ss() rounds an SSIM to 3 places. au() gives AUC as is, with 4 places, because clean scores
+   only differ in the 4th digit.
+*/
 std::string get(char e, const std::string &image, const std::string &param, const std::string &col = "ssim")
 {
     auto it = R.find(EXP.at(e) + "|" + image + "|" + param);
@@ -145,16 +163,21 @@ std::string ss(char e, const std::string &image, const std::string &param, int p
 }
 std::string au(char e, const std::string &image, const std::string &param)
 {
-    return get(e, image, param, "auc");  // four places: clean scores differ only there
+    return get(e, image, param, "auc");
 }
 
-// Percentage of an SSIM change (a to b) contributed by the flat windows.
+/*
+   How many percent of an SSIM change (a to b) came from the flat windows.
+*/
 std::string flat_share(double frac, double flat_a, double flat_b, double rest_a, double rest_b)
 {
     double f = frac * (flat_b - flat_a);
     return rnd(100 * f / (f + (1 - frac) * (rest_b - rest_a)), 0);
 }
 
+/*
+   The difference between two SSIMs in the table, done exactly and then rounded.
+*/
 std::string gap(char e, const std::string &im_a, const std::string &p_a, const std::string &im_b,
                 const std::string &p_b)
 {
@@ -171,7 +194,7 @@ int main()
     double max_std = 0;
     for (const auto &[k, r] : R)
         if (!r.at("ssim_std").empty()) max_std = std::max(max_std, std::stod(r.at("ssim_std")));
-    auto energy = [&](const std::string &n) {  // energy per lit pixel, edges over raw
+    auto energy = [&](const std::string &n) {
         return (E[n + "_edges_energy"] / E[n + "_edges_lit_frac"]) / (E[n + "_raw_energy"] / E[n + "_raw_lit_frac"]);
     };
     std::vector<double> sc_text = G.mean0("text_errs_random");
@@ -180,7 +203,8 @@ int main()
         for (int N : {512, 1024})
             auc_clean_min = std::min(auc_clean_min, std::stod(au('n', n, std::format("N={}/image", N))));
     std::vector<double> own_var;
-    // The lengths of data/sweep_window_len.npz, hardcoded: that array is int64, which cnpy cannot type.
+    // NOTE: these are the lengths in data/sweep_window_len.npz. They're hardcoded because that
+    // array is int64 and cnpy can't tell int64 from float64.
     for (int N : {128, 256, 512, 1024, 2048, 4096}) own_var.push_back(L[std::format("photo_own_flat_var_{}", N)]);
 
     std::vector<std::pair<std::string, std::string>> M = {
@@ -310,7 +334,6 @@ int main()
     nums << "% Generated by bin/make_numbers. Do not edit.\n";
     for (const auto &[k, v] : M) nums << std::format("\\newcommand{{\\num{}}}{{{}}}\n", k, v);
 
-    // Table I and the same rows as Markdown for the README.
     const std::map<std::string, std::string> MODE = {{"text", "edges"}, {"line", "edges"}, {"photo", "raw"}};
     struct Headline {
         std::string label;
@@ -357,7 +380,8 @@ int main()
         std::ofstream("README.md") << readme;
     }
 
-    // Acoustic results exist only once bin/analyze_recording has scored real recordings.
+    // NOTE: until bin/analyze_recording has scored real recordings, the paper says plainly that
+    // nothing was measured through a speaker. No acoustic number is ever made up.
     std::map<std::string, std::string> A = {
         {"Abstract", "Acoustic recovery through a physical speaker and microphone is not measured here."},
         {"Contribution", ""},

@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Phase recovery by Griffin-Lim alternating projections.
+Griffin-Lim phase recovery.
 */
 #include <numbers>
 #include <random>
@@ -12,6 +12,11 @@ Phase recovery by Griffin-Lim alternating projections.
 
 namespace sc {
 
+/*
+   Start with S and some phase. Then every iteration: ISTFT then STFT again, which gives us the
+   closest thing that is an actual sound. Keep its phase, throw away its magnitude, put S back.
+   Where |Y| is exactly 0 there is no phase to keep, so we just use phase 0 there.
+*/
 Phase_Result griffin_lim(const Image &S, int N, int H, const std::vector<double> &w, int n_iter,
                          const std::string &init, unsigned seed)
 {
@@ -27,9 +32,9 @@ Phase_Result griffin_lim(const Image &S, int N, int H, const std::vector<double>
 
     Phase_Result out;
     for (int i = 0; i < n_iter; ++i) {
-        Spectrum Y = stft(istft(X, N, H, w), N, H, w).colRange(0, S.cols);  // project onto real sounds
+        Spectrum Y = stft(istft(X, N, H, w), N, H, w).colRange(0, S.cols);
         out.errs.push_back(spectral_convergence(Y, S));
-        for (int k = 0; k < S.rows; ++k)  // keep Y's phase, restore our magnitudes
+        for (int k = 0; k < S.rows; ++k)
             for (int m = 0; m < S.cols; ++m) {
                 double a = std::abs(Y(k, m));
                 X(k, m) = a > 0 ? S(k, m) * Y(k, m) / a : std::complex<double>(S(k, m), 0.0);

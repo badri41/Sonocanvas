@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Unit tests for the core (doctest). Run with `make test`.
+Tests for the core, with doctest. `make test` runs them.
 */
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <doctest/doctest.h>
@@ -18,7 +18,8 @@ constexpr int N = 1024, H = 256, SR = 22050;
 
 TEST_CASE("STFT then ISTFT returns white noise to 1e-8")
 {
-    // Length is a multiple of H: istft returns H floor(L/H) samples, so a tail would be cut otherwise.
+    // NOTE: the length is a multiple of H on purpose. istft gives back H*floor(L/H) samples,
+    // so any leftover tail would get cut and the comparison would fail.
     std::mt19937 rng(0);
     std::normal_distribution<double> g;
     Signal x(200 * H);
@@ -61,7 +62,7 @@ TEST_CASE("AUC equals the pairwise definition, ties included")
     for (int i = 0; i < 30; ++i)
         for (int j = 0; j < 40; ++j) {
             target(i, j) = U(rng) > 0.7;
-            rec(i, j) = std::round((U(rng) + 0.4 * target(i, j)) * 10) / 10;  // rounded: many ties
+            rec(i, j) = std::round((U(rng) + 0.4 * target(i, j)) * 10) / 10;
         }
     double gt = 0, eq = 0, pairs = 0;
     for (auto s = rec.begin(), ts = target.begin(); s != rec.end(); ++s, ++ts)
@@ -116,12 +117,12 @@ TEST_CASE("long text is shrunk to fit the canvas")
 
 TEST_CASE("fixed font keeps the glyph height and lengthens the clip")
 {
-    auto height = [](const Image &m) {  // rows containing ink
+    auto height = [](const Image &m) {
         cv::Mat rows;
         cv::reduce(m, rows, 1, cv::REDUCE_MAX);
         return cv::countNonZero(rows);
     };
-    CHECK(cv::norm(render_text("HELLO", 900, 260, false), render_text("HELLO")) == 0);  // short text: unchanged
+    CHECK(cv::norm(render_text("HELLO", 900, 260, false), render_text("HELLO")) == 0);
     Image wide = render_text("DRAWING WITH SOUND", 900, 260, false);
     CHECK(wide.cols > 900);
     CHECK(height(wide) == height(render_text("HELLO")));

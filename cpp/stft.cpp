@@ -2,7 +2,8 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Windows, STFT and weighted overlap-add ISTFT. The DFT itself is OpenCV's cv::dft.
+Windows, STFT and the overlap-add inverse. The framing and the overlap-add are done by hand,
+the DFT itself is just cv::dft.
 */
 #include <cmath>
 #include <numbers>
@@ -26,26 +27,34 @@ std::vector<double> window(const std::string &name, int N)
     return w;
 }
 
+/*
+   Pad, cut into windowed frames (one per row), DFT every row, keep bins 0..N/2 and transpose
+   so it comes out as bins x frames.
+*/
 Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
 {
-    Signal xp(x.size() + N, 0.0);  // N/2 zeros on each side
+    Signal xp(x.size() + N, 0.0);
     std::copy(x.begin(), x.end(), xp.begin() + N / 2);
     int M = 1 + int(xp.size() - N) / H;
 
-    cv::Mat frames(M, N, CV_64F);  // one windowed frame per row
+    cv::Mat frames(M, N, CV_64F);
     for (int m = 0; m < M; ++m)
         for (int n = 0; n < N; ++n) frames.at<double>(m, n) = xp[m * H + n] * w[n];
 
     cv::Mat F;
-    cv::dft(frames, F, cv::DFT_ROWS | cv::DFT_COMPLEX_OUTPUT);  // M x N complex
-    return Spectrum(F.colRange(0, N / 2 + 1).t());              // keep k = 0..N/2, as bins x frames
+    cv::dft(frames, F, cv::DFT_ROWS | cv::DFT_COMPLEX_OUTPUT);
+    return Spectrum(F.colRange(0, N / 2 + 1).t());
 }
 
+/*
+   Every frame goes back through the inverse DFT, gets multiplied by the window again and added
+   at its place, and at the end we divide by how much window landed on each sample.
+*/
 Signal istft(const Spectrum &X, int N, int H, const std::vector<double> &w)
 {
     int M = X.cols;
-    // Each frame's half spectrum in OpenCV's packed real format [Re_0, Re_1, Im_1, ..., Re_{N/2}],
-    // so one inverse DFT per row returns the real frame y_m (the 1/N scale included).
+    // NOTE: cv::dft wants a real signal's half spectrum packed as [Re_0, Re_1, Im_1, ..., Re_{N/2}].
+    // Then one inverse DFT per row gives back the real frame, already divided by N.
     cv::Mat packed(M, N, CV_64F);
     for (int m = 0; m < M; ++m) {
         double *row = packed.ptr<double>(m);

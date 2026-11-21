@@ -2,8 +2,8 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Write data/video.npz: the real waveforms and decoded images the Manim scenes need.
-The scene 3 shapes are encoded at 1.6 s, so each plays in full as it appears.
+Makes data/video.npz: the real waveforms and decoded pictures the Manim scenes show.
+The scene 3 shapes are only 1.6 s long so each one plays in full while it is on screen.
 */
 #include <format>
 #include <functional>

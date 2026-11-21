@@ -1,9 +1,9 @@
-"""Draw figures/<name>.{pdf,png} from data/<name>.npz (written by bin/experiments).
+"""Draws figures/<name>.{pdf,png} from data/<name>.npz, which bin/experiments wrote.
 
-    python plots.py                    # every experiment
-    python plots.py noise_robustness   # one
+    python plots.py                    # all of them
+    python plots.py noise_robustness   # just one
 
-Matplotlib stays in Python: the figures are the paper's, and only this script draws them.
+This stays Python because matplotlib has no real C++ equivalent. It only draws, it computes nothing.
 """
 import sys
 from pathlib import Path
@@ -46,6 +46,7 @@ plt.rcParams.update({
 
 
 def show(a: plt.Axes, img: np.ndarray, title: str) -> None:
+    """One picture in magma with a title and no axes."""
     a.imshow(img, cmap="magma", aspect="auto", vmin=0, vmax=1)
     a.set_title(title, pad=2)
     a.set(xticks=[], yticks=[])
@@ -54,6 +55,7 @@ def show(a: plt.Axes, img: np.ndarray, title: str) -> None:
 
 
 def plot_edges_vs_filled(d) -> plt.Figure:
+    """Experiment 1: target and decoded, filled vs edges, for all three pictures."""
     fig, ax = plt.subplots(3, 4, figsize=(7.16, 3.5), layout="constrained")
     for i, n in enumerate(NAMES):
         for j, mode in enumerate(("raw", "edges")):
@@ -67,6 +69,7 @@ LENGTHS = (128, 256, 512, 1024, 2048, 4096)
 
 
 def plot_sweep_window_len(d) -> plt.Figure:
+    """Experiment 2: scores against window length N, plus the decoded text at a few N."""
     fig = plt.figure(figsize=(3.5, 3.9), layout="constrained")
     top, bot = fig.subfigures(2, 1, height_ratios=[1, 3.3])
     ax = top.subplots(1, 3)
@@ -94,6 +97,7 @@ WINDOWS = ("rect", "hann", "hamming", "blackman")
 
 
 def plot_sweep_window_type(d) -> plt.Figure:
+    """Experiment 3: what each window looks like in frequency, and how it scores."""
     fig, (a, c, b) = plt.subplots(1, 3, figsize=(7.16, 2.3), layout="constrained", width_ratios=[1.5, 1, 1])
     for w, col, ls in zip(WINDOWS, ("#2a78d6", "#eb6834", "#1baf7a", "#6250d6"), ("-", "-", "--", ":")):
         a.plot(d[f"{w}_bins"], d[f"{w}_db"], color=col, ls=ls, lw=1.1,
@@ -122,6 +126,7 @@ CURVE_LEN = 201
 
 
 def plot_gl_iterations(d) -> plt.Figure:
+    """Experiment 4: Griffin-Lim error and scores against the number of iterations."""
     fig, (a, c, b) = plt.subplots(3, 1, figsize=(3.5, 4.0), sharex=True, layout="constrained")
     it = np.arange(CURVE_LEN)
     for n in NAMES:
@@ -143,6 +148,7 @@ def plot_gl_iterations(d) -> plt.Figure:
 
 
 def plot_mel_vs_linear(d) -> plt.Figure:
+    """Experiment 5: linear or mel encoding, viewed on a linear or mel axis."""
     fig, ax = plt.subplots(2, 2, figsize=(3.5, 2.2), layout="constrained")
     for i, enc in enumerate(("linear", "mel")):
         for j, vw in enumerate(("linear", "mel")):
@@ -156,6 +162,7 @@ SNRS = (30, 20, 10, 5, 0)
 
 
 def plot_noise_robustness(d) -> plt.Figure:
+    """Experiment 6: scores against SNR, same SNR vs same noise floor."""
     fig = plt.figure(figsize=(3.5, 4.5), layout="constrained")
     top, bot = fig.subfigures(2, 1, height_ratios=[1, 4.4])
     for a, snr in zip(top.subplots(1, 3), (20, 10, 0)):

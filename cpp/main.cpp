@@ -2,15 +2,16 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Command-line tool.
+The sonocanvas command.
 
   bin/sonocanvas encode TEXT -o OUT.wav [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
   bin/sonocanvas decode IN.wav TEXT     [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
 
-encode writes the WAV; decode scores an existing WAV against the picture TEXT (or --image) would make.
-Both print AUC, SSIM and PSNR. --png writes the answer key (target above decoded); --npz writes
-target, rec and the scores for other programs (the demo app reads it).
+encode turns TEXT (or an image) into a WAV. decode takes a WAV you already have and checks it
+against the picture TEXT would make. Both print AUC, SSIM and PSNR. --png saves the answer key
+(target on top, decoded below), --npz saves target, rec and the scores for the demo app.
 */
+
 #include <format>
 #include <print>
 
@@ -68,7 +69,7 @@ int main(int argc, char **argv)
             std::println(stderr, "{} is {} Hz; expected {} Hz", wav, sr, p.sr);
             return 1;
         }
-        target = sc::band_image(sc::image_to_mag(img, p), p);  // the target needs no phase
+        target = sc::band_image(sc::image_to_mag(img, p), p);
     }
     sc::Image rec = sc::decode(x, p);
     double a = sc::auc(target, rec), s = sc::ssim(target, rec), q = sc::psnr(target, rec);

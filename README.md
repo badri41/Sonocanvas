@@ -401,7 +401,6 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | Path | Contents |
 |---|---|
 | `Makefile` | Build and pipeline targets (`make help`) |
-| `.clang-format` | C++ code style (nob.h layout); run `clang-format -i cpp/*.cpp cpp/*.hpp` |
 | `cpp/` | The library, the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
 | `plots.py`, `app.py` | The figures and the demo page (Python) |
 | `tests/test_app.py` | The app's tests (pytest) |
