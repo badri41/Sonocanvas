@@ -228,7 +228,7 @@ Renders the eight Manim scenes and joins them into `video/sonocanvas_720p30.mp4`
 | `scene_05_phase.py` | `MissingPhase` | The missing phase; Griffin–Lim |
 | `scene_06_uncertainty.py` | `Uncertainty` | The window-length trade-off, from `data/sweep_window_len.npz` |
 | `scene_07_air.py` | `Air` | Griffin–Lim grain (outlines vs filled shapes), then speaker to microphone (uses `data/acoustic_video.npz` once a take is chosen) |
-| `scene_08_outro.py` | `Outro` | The whole loop, phone footage (`video/assets/phone.mp4` when recorded), the invitation to the live demo |
+| `scene_08_outro.py` | `Outro` | The whole loop, then the invitation to the live demo |
 
 Preview one scene: `manim -pqm video/scene_06_uncertainty.py Uncertainty`.
 
@@ -236,16 +236,18 @@ Preview one scene: `manim -pqm video/scene_06_uncertainty.py Uncertainty`.
 
 Prints each scene's length and writes the start and end times into the `narration.md` headings.
 
-- Each sentence lasts its word count at 120 wpm.
-- `[3 s]` in the text is a silent beat.
-- Once `media/voice/NN.wav` exists, that scene's spoken beats are stretched to match the recording.
+- Plain lines are spoken, `*italic*` lines are stage directions, `[1 s]` is a pause. Each sentence and pause is one slot.
+- Before a recording exists, a sentence lasts its word count at 140 wpm.
+- Once `media/voice/NN.wav` exists, slots come from the speech found by `ffmpeg silencedetect` (gaps of 0.3 s or more), so every animation starts on its sentence. If the gaps and sentences don't line up it says so and stretches the estimate instead.
+- `SONOCANVAS_ENDING=A` or `B` picks scene 7's ending (default B).
+- Animations play at their natural speed (`say(..., rt=...)`, 1-3 s), then the scene holds until the sentence ends.
 - It flags a total over 5:00.
 
 ### python video/add_voice.py [--prepare]
 
 - **`--prepare`** trims the silence at both ends of each `video/voice/01.*` … `08.*`, and writes them to
   `media/voice/NN.wav` (48 kHz mono).
-- **No option:** after `render.sh h`, it mixes each voice file in at its scene's first frame. The scene
+- **No option:** after `render.sh h`, it mixes each voice file in where its scene's first sentence starts. The scene
   audio stays underneath at 0.7 gain. It then loudness-normalises in two passes to −16 LUFS, with a
   −1.5 dBTP ceiling, and writes `video/sonocanvas_final_1080p.mp4`.
 
