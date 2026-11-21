@@ -15,23 +15,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 NAMES = ("text", "line", "photo")
-
-
 LABEL = {"text": "text", "line": "line drawing", "photo": "photo"}
-
-
 MODE = {"text": "edges", "line": "edges", "photo": "raw"}
-
-
 FIG, DATA = Path("figures"), Path("data")
-
-
 COLOR = {"text": "#2a78d6", "line": "#eb6834", "photo": "#1baf7a"}
-
-
 MARK = {"text": "o", "line": "s", "photo": "^"}
-
-
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
 
@@ -64,9 +52,6 @@ def plot_edges_vs_filled(d) -> plt.Figure:
                                   (ax[i, 2 * j + 1], "rec", f"AUC {d[f'{n}_{mode}_auc']:.4f}, SSIM {d[f'{n}_{mode}_ssim']:.3f}")):
                 show(a, d[f"{n}_{mode}_{key}"], title)
     return fig
-
-
-LENGTHS = (128, 256, 512, 1024, 2048, 4096)
 
 
 def plot_sweep_window_len(d) -> plt.Figure:
@@ -120,16 +105,10 @@ def plot_sweep_window_type(d) -> plt.Figure:
     return fig
 
 
-ITERS = (0, 1, 2, 5, 10, 20, 60, 100, 200)
-
-
-CURVE_LEN = 201
-
-
 def plot_gl_iterations(d) -> plt.Figure:
     """Experiment 4: Griffin-Lim error and scores against the number of iterations."""
     fig, (a, c, b) = plt.subplots(3, 1, figsize=(3.5, 4.0), sharex=True, layout="constrained")
-    it = np.arange(CURVE_LEN)
+    it = np.arange(len(d["text_errs_zero"]))
     for n in NAMES:
         a.plot(it + 1, d[f"{n}_errs_random"].mean(0), color=COLOR[n], label=f"{LABEL[n]}, random")
         a.plot(it + 1, d[f"{n}_errs_zero"], color=COLOR[n], ls=":", label=f"{LABEL[n]}, zero")
@@ -157,9 +136,6 @@ def plot_mel_vs_linear(d) -> plt.Figure:
                  f"{enc} $\\to$ {vw}: AUC {float(d[f'text_{enc}_{vw}_auc']):.3f}")
     fig.suptitle("encoding axis $\\to$ viewing axis", fontsize=8)
     return fig
-
-
-SNRS = (30, 20, 10, 5, 0)
 
 
 def plot_noise_robustness(d) -> plt.Figure:

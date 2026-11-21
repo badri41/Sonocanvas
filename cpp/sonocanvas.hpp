@@ -192,14 +192,24 @@ void save_figure(const std::string &path, const Image &target, const Image &rec,
                  const std::string &bottom);
 
 /*
+   CSV the dumb way: no quoting, so no field may contain a comma. Mine never do.
+   split_csv also eats a trailing \r (files saved on Windows) and keeps an empty last field.
+   read_csv skips the header line, write_csv writes it and creates the folder if needed.
+*/
+std::vector<std::string> split_csv(std::string line);
+std::vector<std::vector<std::string>> read_csv(const std::string &path);
+void write_csv(const std::string &path, const std::string &header, const std::vector<std::vector<std::string>> &rows);
+
+/*
    Collects named arrays into a NumPy .npz so plots.py and the video can read them.
-   Images and vectors go in as float32, int vectors as int64, scalars as float64.
+   Images, vectors and tables (rows x cols) go in as float32, int vectors as int64, scalars as float64.
 */
 class Npz {
 public:
     explicit Npz(std::string path) : path_(std::move(path)) {}
     void add(const std::string &name, const Image &m);
-    void add(const std::string &name, const std::vector<double> &v, std::vector<size_t> shape = {});
+    void add(const std::string &name, const std::vector<double> &v);
+    void add(const std::string &name, const std::vector<std::vector<double>> &rows);
     void add(const std::string &name, const std::vector<int> &v);
     void add(const std::string &name, double v);
 

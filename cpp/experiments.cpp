@@ -19,13 +19,11 @@ photo is Chelsea the cat. Both images are CC0 and live in data/images/. Text and
 #include <cmath>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
 #include <map>
 #include <numbers>
 #include <print>
 #include <random>
-#include <sstream>
 
 #include <CLI/CLI.hpp>
 #include <opencv2/imgproc.hpp>
@@ -71,22 +69,7 @@ double masked_mean(const Image &m, const cv::Mat &mask)
 */
 Image clip01(const Image &m)
 {
-    Image out = cv::max(cv::min(m, 1.0), 0.0);
-    return out;
-}
-
-/*
-   A 2-D table flattened into one vector plus its shape, because that's what Npz::add wants.
-*/
-struct Table_2D {
-    std::vector<double> data;
-    std::vector<size_t> shape;
-};
-Table_2D stack(const std::vector<std::vector<double>> &rows)
-{
-    Table_2D t{{}, {rows.size(), rows.empty() ? 0 : rows[0].size()}};
-    for (const auto &r : rows) t.data.insert(t.data.end(), r.begin(), r.end());
-    return t;
+    return cv::max(cv::min(m, 1.0), 0.0);
 }
 
 /*
@@ -115,8 +98,17 @@ std::map<std::string, Image> base_images()
             {"photo", load("data/images/chelsea.png")}};
 }
 
+/*
+   SSIM, PSNR and AUC of every seed. add() scores one decoded picture against its target.
+*/
 struct Scores {
     std::vector<double> ssim, psnr, auc;
+    void add(const Image &target, const Image &rec)
+    {
+        ssim.push_back(sc::ssim(target, rec));
+        psnr.push_back(sc::psnr(target, rec));
+        auc.push_back(sc::auc(target, rec));
+    }
 };
 struct Trial {
     Scores own;
@@ -137,14 +129,10 @@ Trial trial(const Image &img, const Params &p = {}, int n_iter = 60, const std::
     for (unsigned s : seeds) {
         Encoded e = encode(img, p, n_iter, init, s);
         Image rec = decode(e.x, p);
-        t.own.ssim.push_back(ssim(e.target, rec));
-        t.own.psnr.push_back(psnr(e.target, rec));
-        t.own.auc.push_back(auc(e.target, rec));
+        t.own.add(e.target, rec);
         for (const auto &[k, ref] : refs) {
             Image r2 = clip01(resize(rec, ref.rows, ref.cols));
-            t.ref[k].ssim.push_back(ssim(ref, r2));
-            t.ref[k].psnr.push_back(psnr(ref, r2));
-            t.ref[k].auc.push_back(auc(ref, r2));
+            t.ref[k].add(ref, r2);
             if (s == seeds[0]) t.ref_rec[k] = r2;
         }
         if (s == seeds[0]) {
@@ -286,9 +274,8 @@ std::vector<Row> sweep_window_len(std::map<std::string, Image> &imgs)
             if (n == "text") out.add(std::format("text_rec_{}", N), t.ref_rec["image"]);
         }
         for (std::string k : {"own", "image", "half"}) {
-            Table_2D s = stack(ssims[k]), a = stack(aucs[k]);
-            out.add(n + "_" + k, s.data, s.shape);
-            out.add(n + "_" + k + "_auc", a.data, a.shape);
+            out.add(n + "_" + k, ssims[k]);
+            out.add(n + "_" + k + "_auc", aucs[k]);
         }
     }
     return rows;
@@ -369,8 +356,7 @@ std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
         Image img = preprocess(imgs[n], MODE.at(n));
         std::vector<std::vector<double>> curves;
         for (unsigned s : SEEDS) curves.push_back(trial(img, {}, CURVE_LEN, "random", {s}).first.errs);
-        Table_2D c = stack(curves);
-        out.add(n + "_errs_random", c.data, c.shape);
+        out.add(n + "_errs_random", curves);
         out.add(n + "_errs_zero", trial(img, {}, CURVE_LEN, "zero", {0}).first.errs);
         std::vector<std::vector<double>> ssim_r, auc_r;
         std::vector<double> ssim_z;
@@ -383,10 +369,9 @@ std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
             auc_r.push_back(r.own.auc);
             ssim_z.push_back(z.own.ssim[0]);
         }
-        Table_2D s = stack(ssim_r), a = stack(auc_r);
-        out.add(n + "_ssim_random", s.data, s.shape);
+        out.add(n + "_ssim_random", ssim_r);
         out.add(n + "_ssim_zero", ssim_z);
-        out.add(n + "_auc_random", a.data, a.shape);
+        out.add(n + "_auc_random", auc_r);
     }
     return rows;
 }
@@ -483,10 +468,7 @@ Scores noisy_scores(const Signal &x, const Image &target, double sigma)
 {
     Scores s;
     for (unsigned seed : SEEDS) {
-        Image rec = decode(noisy(x, sigma, 100 + seed));
-        s.ssim.push_back(ssim(target, rec));
-        s.psnr.push_back(psnr(target, rec));
-        s.auc.push_back(auc(target, rec));
+        s.add(target, decode(noisy(x, sigma, 100 + seed)));
     }
     return s;
 }
@@ -514,9 +496,8 @@ std::vector<Row> noise_robustness(std::map<std::string, Image> &imgs)
             ss.push_back(s.ssim);
             us.push_back(s.auc);
         }
-        Table_2D a = stack(ss), b = stack(us);
-        out.add(key + "ssim", a.data, a.shape);
-        out.add(key + "auc", b.data, b.shape);
+        out.add(key + "ssim", ss);
+        out.add(key + "auc", us);
     };
     for (const auto &n : NAMES)
         for (std::string mode : {"raw", "edges"}) series(n, mode, enc[n + "/" + mode].x, "snr", n + "_" + mode + "_");
@@ -536,29 +517,14 @@ const std::vector<std::pair<std::string, Experiment>> EXPERIMENTS = {
     {"mel_vs_linear", mel_vs_linear},         {"noise_robustness", noise_robustness}};
 
 /*
-   Splits a CSV line on commas, keeping an empty last field.
-*/
-std::vector<std::string> split(const std::string &line)
-{
-    std::vector<std::string> f;
-    std::stringstream ss(line);
-    for (std::string x; std::getline(ss, x, ',');) f.push_back(x);
-    if (!line.empty() && line.back() == ',') f.push_back("");
-    return f;
-}
-
-/*
    Swaps in the rows of the experiments I just ran and keeps the rest, in experiment order.
 */
 void update_table(const std::map<std::string, std::vector<Row>> &fresh)
 {
     const std::string path = "results/table.csv";
     std::vector<Row> rows;
-    std::ifstream in(path);
-    std::string line;
-    std::getline(in, line);
-    while (std::getline(in, line))
-        if (Row r = split(line); !r.empty() && !fresh.contains(r[0])) rows.push_back(r);
+    for (Row &r : read_csv(path))
+        if (!r.empty() && !fresh.contains(r[0])) rows.push_back(r);
     for (const auto &[name, rs] : fresh) rows.insert(rows.end(), rs.begin(), rs.end());
     auto order = [](const std::string &e) {
         for (size_t i = 0; i < EXPERIMENTS.size(); ++i)
@@ -566,12 +532,7 @@ void update_table(const std::map<std::string, std::vector<Row>> &fresh)
         return EXPERIMENTS.size();
     };
     std::stable_sort(rows.begin(), rows.end(), [&](const Row &a, const Row &b) { return order(a[0]) < order(b[0]); });
-    std::ofstream f(path);
-    f << "experiment,image,param,auc,auc_std,ssim,ssim_std,psnr_db\n";
-    for (const Row &r : rows) {
-        for (size_t i = 0; i < r.size(); ++i) f << (i ? "," : "") << r[i];
-        f << "\n";
-    }
+    write_csv(path, "experiment,image,param,auc,auc_std,ssim,ssim_std,psnr_db", rows);
 }
 
 int main(int argc, char **argv)

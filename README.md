@@ -394,7 +394,8 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 |---|---|
 | `write_wav(path, x, sr)`, `read_wav(path, &sr)` | 16-bit WAV through libsndfile; reading mixes down to mono |
 | `save_figure(path, target, rec, top, bottom)` | The answer-key PNG: two magma panels with titles |
-| `Npz(path).add(name, value)` | Writes images, vectors, integer vectors or scalars into a NumPy `.npz` |
+| `split_csv(line)`, `read_csv(path)`, `write_csv(path, header, rows)` | Plain CSV, no quoting. `read_csv` skips the header, `write_csv` creates the folder |
+| `Npz(path).add(name, value)` | Writes images, vectors, tables (rows x cols), integer vectors or scalars into a NumPy `.npz`; creates the folder |
 
 ## FILES
 

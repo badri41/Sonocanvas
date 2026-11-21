@@ -20,9 +20,7 @@ Then decode() sees exactly the clip.
 #include <cstdlib>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <print>
-#include <sstream>
 
 #include <CLI/CLI.hpp>
 #include <opencv2/imgproc.hpp>
@@ -105,26 +103,13 @@ void save_row(const std::vector<std::string> &row)
 {
     const std::string path = "results/acoustic.csv";
     std::vector<std::vector<std::string>> rows;
-    std::ifstream in(path);
-    std::string line;
-    std::getline(in, line);
-    while (std::getline(in, line)) {
-        std::vector<std::string> f;
-        std::stringstream ss(line);
-        for (std::string x; std::getline(ss, x, ',');) f.push_back(x);
+    for (auto &f : read_csv(path))
         if (!std::equal(f.begin(), f.begin() + 4, row.begin())) rows.push_back(f);
-    }
     rows.push_back(row);
     std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
         return std::tuple(a[0], std::stod(a[1]), a[2], a[3]) < std::tuple(b[0], std::stod(b[1]), b[2], b[3]);
     });
-    std::filesystem::create_directories("results");
-    std::ofstream f(path);
-    f << "word,dist_m,device,take,auc,ssim,psnr_db,delay_s,peak_ratio,snr_db\n";
-    for (const auto &r : rows) {
-        for (size_t i = 0; i < r.size(); ++i) f << (i ? "," : "") << r[i];
-        f << "\n";
-    }
+    write_csv(path, "word,dist_m,device,take,auc,ssim,psnr_db,delay_s,peak_ratio,snr_db", rows);
 }
 
 int main(int argc, char **argv)
