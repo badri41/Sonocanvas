@@ -31,7 +31,7 @@ Image load(const std::string &path)
 
 /*
    Draws the text white at `px` pixels on a big black canvas and crops it to the ink, so I know
-   exactly how wide the letters really are. Font metrics lie, pixels don't.
+   exactly how wide the letters are. Advance widths include side bearings, so the pixels are more exact.
    The font is loaded once and kept; it throws if the file is missing.
 */
 static cv::Mat ink(const std::string &text, int px)
@@ -68,7 +68,6 @@ double text_duration(const Image &img, int w, double dur)
 
 /*
    A flat image normalises to all zeros, which main() then rejects as "nothing to encode".
-   Better than encoding silence and pretending it worked.
 */
 Image preprocess(const Image &img, const std::string &mode, double gamma, int dilate)
 {

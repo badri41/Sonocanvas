@@ -3,7 +3,7 @@ SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
 You played a demo WAV through a speaker and recorded it. This tells you how much survived.
-It's the only test here that touches the real world; everything else is simulation.
+It's the only measurement here through a real speaker and microphone; the rest is simulation.
 
   bin/analyze_recording take.m4a --word DA321 --dist 2 --device phone [--take 1] [--video]
 

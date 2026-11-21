@@ -4,7 +4,7 @@ Copyright (c) 2026 Badri Bishal Das
 
 Writes paper/numbers.tex, paper/table1.tex, paper/acoustic.tex and the README results table, all
 from results/table.csv and the .npz files in data/. Every number in main.tex is a macro made here,
-so I never type a result by hand. Hand-typed numbers are how papers end up lying by accident.
+so no result is typed by hand and the paper can't drift from the data.
 
 Rounding is half-up on the shortest decimal form (0.9135 -> 0.914). Rounding the double itself
 would sometimes go the wrong way, because 0.9135 is really 0.91349999... in binary.

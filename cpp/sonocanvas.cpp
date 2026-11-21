@@ -21,8 +21,7 @@ Image band_image(const Image &mag, const Params &p)
 }
 
 /*
-   I scale the waveform so its peak is 0.9. The WAV never clips, and there's some headroom left
-   for whatever the player does to it.
+   I scale the waveform so its peak is 0.9: it never clips, and there's headroom for playback processing.
 */
 Encoded encode(const Image &img, const Params &p, int n_iter, const std::string &init, unsigned seed)
 {

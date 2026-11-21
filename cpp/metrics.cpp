@@ -2,8 +2,8 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-The scores: SSIM, PSNR, AUC and spectral convergence. SSIM is the one everyone quotes,
-AUC is the one I actually trust.
+The scores: SSIM, PSNR, AUC and spectral convergence. AUC is the main legibility
+score here: SSIM penalises speckle on flat regions even when it doesn't hurt reading.
 */
 #include <algorithm>
 #include <cmath>
@@ -51,8 +51,8 @@ double psnr(const Image &a, const Image &b)
 /*
    Mann-Whitney: rank all pixels of rec (ties get their average rank), add up the ranks of the
    stroke pixels, and AUC = (rank sum - n1*(n1 + 1)/2) / (n1*n0). Same as comparing every
-   stroke/background pair, but O(n log n) instead of O(n^2). With 140k pixels the naive
-   version is not happening.
+   stroke/background pair, but O(n log n) instead of O(n^2). With 140k pixels the pairwise
+   version would be billions of comparisons.
 */
 double auc(const Image &target, const Image &rec)
 {

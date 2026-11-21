@@ -40,8 +40,8 @@ cv::Range band(const Params &p)
 }
 
 /*
-   I flip the picture first so row 0 is the lowest frequency, same as the bins.
-   Saves me index gymnastics in the loop.
+   I flip the picture first so row 0 is the lowest frequency, same as the bins. That way the bin
+   index and the row index run in the same direction.
 */
 Image image_to_mag(const Image &img, const Params &p)
 {

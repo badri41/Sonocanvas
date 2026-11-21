@@ -125,7 +125,7 @@ Image preprocess(const Image &img, const std::string &mode = "raw", double gamma
 
 /*
    Resize without aliasing: blur first (sigma = max(0, (s - 1)/2), s = how much I shrink),
-   then bilinear. Same recipe as scikit-image's resize. Plain cv::resize aliases when it shrinks, so no.
+   then bilinear. Same recipe as scikit-image's resize. Plain cv::resize aliases when it shrinks.
 */
 Image resize(const Image &img, int rows, int cols);
 
@@ -175,7 +175,7 @@ Encoded encode(const Image &img, const Params &p = {}, int n_iter = 60, const st
 
 /*
    The decoder: STFT the sound, cut out the band, and put it on the same grid as Encoded::target.
-   It only knows Params, nothing from the encoder, exactly like a phone app. No cheating.
+   It only knows Params, nothing from the encoder, exactly like a phone app.
 */
 Image decode(const Signal &x, const Params &p = {});
 
@@ -192,7 +192,7 @@ void save_figure(const std::string &path, const Image &target, const Image &rec,
                  const std::string &bottom);
 
 /*
-   CSV the dumb way: no quoting, so no field may contain a comma. Mine never do.
+   Minimal CSV: no quoting, so no field may contain a comma (none of mine do).
    split_csv also eats a trailing \r (files saved on Windows) and keeps an empty last field.
    read_csv skips the header line, write_csv writes it and creates the folder if needed.
 */

@@ -2,8 +2,8 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Windows, STFT and the overlap-add inverse. I wrote the framing and the overlap-add by hand because
-that's the part worth understanding. The FFT itself is cv::dft. Writing my own FFT here would be pure ego.
+Windows, STFT and the overlap-add inverse. I wrote the framing and the overlap-add by hand, since that's
+the part of the method I want visible. The FFT itself is cv::dft; my own FFT would add code and teach nothing new.
 */
 #include <cmath>
 #include <numbers>
@@ -29,7 +29,7 @@ std::vector<double> window(const std::string &name, int N)
 
 /*
    Pad, cut into windowed frames (one per row), DFT every row, keep bins 0..N/2 and transpose
-   so it comes out as bins x frames. Nothing fancy.
+   so it comes out as bins x frames.
 */
 Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
 {

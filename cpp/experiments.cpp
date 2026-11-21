@@ -9,7 +9,7 @@ The six experiments from the paper.
 
 Every experiment writes data/<name>.npz (plots.py and make_numbers read those) and replaces its own
 rows in results/table.csv: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR.
-Every number is a mean (and std) over five seeds, so one lucky run can't fool me.
+Every number is a mean (and std) over five seeds, so a single lucky seed can't decide a result.
 
 Three test pictures: text is DA321, line is the horse silhouette (its edges make a line drawing),
 photo is Chelsea the cat. Both images are CC0 and live in data/images/. Text and line go in as
@@ -242,8 +242,8 @@ std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
 const std::vector<int> LENGTHS = {128, 256, 512, 1024, 2048, 4096};
 
 /*
-   Experiment 2: window length N. This one is easy to get wrong: every N makes a different target grid, so "own"
-   scores can't be compared across N. "image" scores every result against the original picture on
+   Experiment 2: window length N. Careful with the scoring: every N makes a different target grid,
+   so "own" scores can't be compared across N. "image" scores every result against the original picture on
    one fixed grid, and "half" does the same at half size to show the ranking doesn't depend on the grid.
 */
 std::vector<Row> sweep_window_len(std::map<std::string, Image> &imgs)
