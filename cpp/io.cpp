@@ -3,6 +3,7 @@ SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
 Files: WAV through libsndfile, the answer-key PNG through OpenCV, .npz through cnpy.
+Boring on purpose. File formats are not where I want to be clever.
 */
 #include <stdexcept>
 

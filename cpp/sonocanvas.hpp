@@ -49,16 +49,17 @@ struct Params {
 std::vector<double> window(const std::string &name, int N);
 
 /*
-   STFT. We pad x with N/2 zeros on both sides so the first frame is centred on sample 0,
+   STFT. I pad x with N/2 zeros on both sides so the first frame is centred on sample 0,
    then X[k,m] = sum_{n=0..N-1} x[n + mH]*w[n]*exp(-j*2pi*k*n/N). You get (N/2+1) x M back.
 */
 Spectrum stft(const Signal &x, int n_fft, int hop, const std::vector<double> &win);
 
 /*
    Inverse STFT by weighted overlap-add (Griffin & Lim 1984). Every frame goes back through the
-   IDFT, gets windowed again and summed, then we divide by the summed squared window:
+   IDFT, gets windowed again and summed, then I divide by the summed squared window:
      xhat[n] = sum_m w[n-mH]*y_m[n-mH] / sum_m w[n-mH]^2
-   That's the least-squares answer, so it works even when X is not a real STFT.
+   That's the least-squares answer, so it does the right thing even when X isn't a real STFT,
+   which inside Griffin-Lim it never is.
    The N/2 padding is cut off, so you get H*(M-1) samples.
 */
 Signal istft(const Spectrum &X, int n_fft, int hop, const std::vector<double> &win);
@@ -74,8 +75,8 @@ struct Phase_Result {
 };
 
 /*
-   Griffin-Lim. We only know the magnitudes S, not the phase. So we guess a phase, go to the time
-   domain and back, keep whatever phase came out and put our magnitudes back on it. Repeat.
+   Griffin-Lim. All I have is the magnitudes S, no phase. So I guess a phase, go to the time
+   domain and back, keep whatever phase came out and put my magnitudes back on it. n_iter times.
      X_{i+1} = S*Y/|Y|  where  Y = STFT(ISTFT(X_i))
    init "random" starts from a seeded random phase, init "zero" starts from phase 0.
 */
@@ -93,7 +94,7 @@ double mel(double f);
 cv::Range band(const Params &p);
 
 /*
-   Turns the picture into the magnitude we want the sound to have. Columns become the M frames.
+   Turns the picture into the magnitude I want the sound to have. Columns become the M frames.
    Each bin in the band looks up where it sits between f_lo (bottom row) and f_hi (top row) and
    takes the picture's value there, interpolated between the two nearest rows.
    Everything outside the band stays 0.
@@ -107,7 +108,7 @@ Image load(const std::string &path);
 
 /*
    White DejaVu Sans Bold at 170 px, centred on a black w x h canvas. If the text is too wide
-   (more than 92% of w) we either shrink the font (fit = true) or make the canvas wider (fit = false).
+   (more than 92% of w) I either shrink the font (fit = true) or make the canvas wider (fit = false).
 */
 Image render_text(const std::string &text, int w = 900, int h = 260, bool fit = true);
 
@@ -123,8 +124,8 @@ double text_duration(const Image &img, int w = 900, double dur = 5.0);
 Image preprocess(const Image &img, const std::string &mode = "raw", double gamma = 1.0, int dilate = 1);
 
 /*
-   Resize without aliasing: blur first (sigma = max(0, (s - 1)/2), s = how much we shrink),
-   then bilinear. Same recipe as scikit-image's resize.
+   Resize without aliasing: blur first (sigma = max(0, (s - 1)/2), s = how much I shrink),
+   then bilinear. Same recipe as scikit-image's resize. Plain cv::resize aliases when it shrinks, so no.
 */
 Image resize(const Image &img, int rows, int cols);
 
@@ -144,12 +145,13 @@ double psnr(const Image &a, const Image &b);
 /*
    How well the decoded image tells strokes from background. Pick a random stroke pixel s
    (target > 0.5) and a random background pixel b; AUC is the chance that rec[s] > rec[b],
-   ties count half. 1 is perfect, 0.5 is a coin flip.
+   ties count half. 1 is perfect, 0.5 is a coin flip. SSIM gets confused by speckle on flat
+   areas, this doesn't, so this is the number I trust for "can you read it".
 */
 double auc(const Image &target, const Image &rec);
 
 /*
-   SC = norm(|Y| - S) / norm(S). How far the magnitudes we got are from the ones we wanted.
+   SC = norm(|Y| - S) / norm(S). How far the magnitudes I got are from the ones I wanted.
 */
 double spectral_convergence(const Spectrum &Y, const Image &S);
 
@@ -173,7 +175,7 @@ Encoded encode(const Image &img, const Params &p = {}, int n_iter = 60, const st
 
 /*
    The decoder: STFT the sound, cut out the band, and put it on the same grid as Encoded::target.
-   It only knows Params, nothing from the encoder, just like a phone app.
+   It only knows Params, nothing from the encoder, exactly like a phone app. No cheating.
 */
 Image decode(const Signal &x, const Params &p = {});
 

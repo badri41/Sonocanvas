@@ -2,7 +2,7 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Griffin-Lim phase recovery.
+Griffin-Lim phase recovery. From 1984 and still the simplest thing that works.
 */
 #include <numbers>
 #include <random>
@@ -13,9 +13,9 @@ Griffin-Lim phase recovery.
 namespace sc {
 
 /*
-   Start with S and some phase. Then every iteration: ISTFT then STFT again, which gives us the
-   closest thing that is an actual sound. Keep its phase, throw away its magnitude, put S back.
-   Where |Y| is exactly 0 there is no phase to keep, so we just use phase 0 there.
+   Start with S and some phase. Every iteration I do ISTFT then STFT, which snaps X to the closest
+   thing that is an actual sound. Keep that phase, throw away its magnitude, put S back.
+   Where |Y| is exactly 0 there's no phase to keep, so I just use phase 0 there. Dumb, simple, works.
 */
 Phase_Result griffin_lim(const Image &S, int N, int H, const std::vector<double> &w, int n_iter,
                          const std::string &init, unsigned seed)

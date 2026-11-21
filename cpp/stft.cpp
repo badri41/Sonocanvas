@@ -2,8 +2,8 @@
 SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
-Windows, STFT and the overlap-add inverse. The framing and the overlap-add are done by hand,
-the DFT itself is just cv::dft.
+Windows, STFT and the overlap-add inverse. I wrote the framing and the overlap-add by hand because
+that's the part worth understanding. The FFT itself is cv::dft. Writing my own FFT here would be pure ego.
 */
 #include <cmath>
 #include <numbers>
@@ -29,7 +29,7 @@ std::vector<double> window(const std::string &name, int N)
 
 /*
    Pad, cut into windowed frames (one per row), DFT every row, keep bins 0..N/2 and transpose
-   so it comes out as bins x frames.
+   so it comes out as bins x frames. Nothing fancy.
 */
 Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
 {
@@ -48,13 +48,15 @@ Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
 
 /*
    Every frame goes back through the inverse DFT, gets multiplied by the window again and added
-   at its place, and at the end we divide by how much window landed on each sample.
+   at its place. At the end I divide by how much window landed on each sample. Skip that division
+   and the output wobbles at the hop rate.
 */
 Signal istft(const Spectrum &X, int N, int H, const std::vector<double> &w)
 {
     int M = X.cols;
-    // NOTE: cv::dft wants a real signal's half spectrum packed as [Re_0, Re_1, Im_1, ..., Re_{N/2}].
-    // Then one inverse DFT per row gives back the real frame, already divided by N.
+    // NOTE: cv::dft wants a real signal's half spectrum in this weird packed layout,
+    // [Re_0, Re_1, Im_1, ..., Re_{N/2}]. Ugly, but then one inverse DFT per row hands back the
+    // real frame, already divided by N.
     cv::Mat packed(M, N, CV_64F);
     for (int m = 0; m < M; ++m) {
         double *row = packed.ptr<double>(m);

@@ -9,7 +9,7 @@ The six experiments from the paper.
 
 Every experiment writes data/<name>.npz (plots.py and make_numbers read those) and replaces its own
 rows in results/table.csv: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR.
-Every number is a mean (and std) over five seeds, so one lucky run can't fool us.
+Every number is a mean (and std) over five seeds, so one lucky run can't fool me.
 
 Three test pictures: text is DA321, line is the horse silhouette (its edges make a line drawing),
 photo is Chelsea the cat. Both images are CC0 and live in data/images/. Text and line go in as
@@ -49,7 +49,7 @@ double mean(const std::vector<double> &v)
 }
 
 /*
-   Population std, so we divide by n and not n - 1.
+   Population std, so I divide by n and not n - 1.
 */
 double stdev(const std::vector<double> &v)
 {
@@ -128,7 +128,7 @@ struct Trial {
 
 /*
    Encode and decode once per seed and score it. If you pass reference images, the decoded picture
-   also gets resized onto each of their grids and scored there. We keep seed 0's stuff for the plots.
+   also gets resized onto each of their grids and scored there. I keep seed 0's stuff for the plots.
 */
 Trial trial(const Image &img, const Params &p = {}, int n_iter = 60, const std::string &init = "random",
             const std::vector<unsigned> &seeds = SEEDS, const std::map<std::string, Image> &refs = {})
@@ -254,7 +254,7 @@ std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
 const std::vector<int> LENGTHS = {128, 256, 512, 1024, 2048, 4096};
 
 /*
-   Experiment 2: window length N. Careful here: every N makes a different target grid, so "own"
+   Experiment 2: window length N. This one is easy to get wrong: every N makes a different target grid, so "own"
    scores can't be compared across N. "image" scores every result against the original picture on
    one fixed grid, and "half" does the same at half size to show the ranking doesn't depend on the grid.
 */
@@ -301,7 +301,7 @@ struct Window_Spectrum {
     double sidelobe;
 };
 /*
-   What the window looks like in frequency: |W(f)| in dB, zero padded 32x so we see the lobes,
+   What the window looks like in frequency: |W(f)| in dB, zero padded 32x so I can see the lobes,
    for bins 0..12. Also the highest sidelobe, i.e. how much a pixel leaks into its neighbours.
 */
 Window_Spectrum window_spectrum(const std::string &name, int N = 1024, int pad = 32)
@@ -357,7 +357,7 @@ const std::vector<int> ITERS = {0, 1, 2, 5, 10, 20, 60, 100, 200};
 constexpr int CURVE_LEN = 201;  // errs[i] is the error of X_i, so i = 0..200 needs 201 passes
 
 /*
-   Experiment 4: how many Griffin-Lim iterations do we need? n_iter = 0 is just random phase,
+   Experiment 4: how many Griffin-Lim iterations do I actually need? n_iter = 0 is just random phase,
    x = ISTFT(S*exp(j*phi)) with no fixing at all.
 */
 std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
@@ -548,7 +548,7 @@ std::vector<std::string> split(const std::string &line)
 }
 
 /*
-   Swaps in the rows of the experiments we just ran and keeps the rest, in experiment order.
+   Swaps in the rows of the experiments I just ran and keeps the rest, in experiment order.
 */
 void update_table(const std::map<std::string, std::vector<Row>> &fresh)
 {

@@ -3,7 +3,8 @@
     python plots.py                    # all of them
     python plots.py noise_robustness   # just one
 
-This stays Python because matplotlib has no real C++ equivalent. It only draws, it computes nothing.
+I kept this in Python because matplotlib has no real C++ equivalent, and I'm not drawing axes by
+hand in OpenCV. It only draws, it computes nothing.
 """
 import sys
 from pathlib import Path

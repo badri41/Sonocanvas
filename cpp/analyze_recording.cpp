@@ -3,6 +3,7 @@ SPDX-License-Identifier: MIT
 Copyright (c) 2026 Badri Bishal Das
 
 You played a demo WAV through a speaker and recorded it. This tells you how much survived.
+It's the only test here that touches the real world; everything else is simulation.
 
   bin/analyze_recording take.m4a --word DA321 --dist 2 --device phone [--take 1] [--video]
 
@@ -10,7 +11,7 @@ Anything ffmpeg can read works (a phone .m4a, a .wav), it gets converted to 2205
 It writes a row to results/acoustic.csv (run the same take again and the row gets replaced), the
 picture to figures/acoustic/, and with --video also data/acoustic_video.npz for scene 7.
 
-The recording starts at some random moment, so first we find where the clip is: slide the clip
+The recording starts at some random moment, so first I find where the clip is: slide the clip
 along the recording and take the shift where they match best, d* = argmax_d |sum_n r[n+d]*x[n]|.
 Then decode() sees exactly the clip.
 */
@@ -81,8 +82,8 @@ std::vector<float> correlate(const Signal &r, const Signal &x)
 }
 
 /*
-   In-band SNR. The bits before and after the clip are just the room, so they tell us the noise:
-   10*log10(P_clip/P_noise - 1). We skip 0.1 s around the clip so its edges do not count as noise.
+   In-band SNR. The bits before and after the clip are just the room, so they tell me the noise:
+   10*log10(P_clip/P_noise - 1). I skip 0.1 s around the clip so its edges don't count as noise.
 */
 double snr_db(const Signal &b, size_t d, size_t n)
 {

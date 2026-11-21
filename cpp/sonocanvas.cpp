@@ -21,7 +21,8 @@ Image band_image(const Image &mag, const Params &p)
 }
 
 /*
-   The waveform gets scaled so its peak is 0.9, so the WAV never clips.
+   I scale the waveform so its peak is 0.9. The WAV never clips, and there's some headroom left
+   for whatever the player does to it.
 */
 Encoded encode(const Image &img, const Params &p, int n_iter, const std::string &init, unsigned seed)
 {
@@ -40,7 +41,7 @@ Encoded encode(const Image &img, const Params &p, int n_iter, const std::string 
 
 /*
    A WAV that is not exactly the encoder's length (a recording, say) gives a different number of
-   frames, so we resize onto the target grid: band bins x M frames. For our own WAVs it's a no-op.
+   frames, so I resize onto the target grid: band bins x M frames. For my own WAVs it's a no-op.
 */
 Image decode(const Signal &x, const Params &p)
 {
