@@ -7,8 +7,7 @@ LDLIBS   := -L/opt/homebrew/lib -lopencv_core -lopencv_imgproc -lopencv_imgcodec
             -lopencv_geometry -lsndfile -lz
 PY       := .venv/bin/python
 
-LIB  := cpp/stft.cpp cpp/phase.cpp cpp/freq_map.cpp cpp/image_prep.cpp cpp/metrics.cpp \
-        cpp/sonocanvas.cpp cpp/io.cpp cpp/third_party/cnpy.cpp
+LIB  := cpp/sonocanvas.cpp cpp/third_party/cnpy.cpp
 OBJ  := $(LIB:cpp/%.cpp=build/%.o)
 BINS := bin/sonocanvas bin/experiments bin/analyze_recording bin/make_numbers bin/make_assets bin/test_core
 

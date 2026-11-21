@@ -267,6 +267,8 @@ It checks that the preset WAVs match `demo/` byte for byte, and prints the kit's
 
 ## LIBRARY (cpp/sonocanvas.hpp, namespace sc)
 
+Declared in `cpp/sonocanvas.hpp`, implemented in one file, `cpp/sonocanvas.cpp`, in the same order.
+
 Types:
 - **`Image`** = `cv::Mat_<double>`: rows × cols, values in $[0,1]$, row 0 at the top.
 - **`Spectrum`** = `cv::Mat_<std::complex<double>>`: bins × frames, bin 0 at 0 Hz.
@@ -275,7 +277,7 @@ Types:
   `sr`, `scale` (`"linear"` or `"mel"`) and `window`. `frames()` returns
   $M = 1 + \lfloor d f_s\rfloor/H$.
 
-### Encoder and decoder (`sonocanvas.cpp`)
+### Encoder and decoder
 
 **`Encoded encode(const Image &img, const Params &p = {}, int n_iter = 60, const std::string &init = "random", unsigned seed = 0)`**
 Turns an image into a waveform $x$ with $|\mathrm{STFT}(x)| \approx S(I)$, peak-normalised to
@@ -293,7 +295,7 @@ uses only `p`, never encoder state. Pass the same `dur` that was used to encode.
 Takes a bins × frames magnitude, keeps the band, flips it so row 0 is $f_\text{hi}$, and divides by its
 max.
 
-### Image preparation (`image_prep.cpp`)
+### Image preparation
 
 **`Image load(const std::string &path)`**
 Reads an 8- or 16-bit grayscale image as $[0,1]$.
@@ -323,7 +325,7 @@ An anti-aliased resize, the same recipe as scikit-image's:
 1. Blur with a Gaussian of $\sigma = \max(0, (s-1)/2)$ per axis, where $s$ is the shrink factor.
 2. Interpolate bilinearly.
 
-### Frequency map (`freq_map.cpp`)
+### Frequency map
 
 **`Image image_to_mag(const Image &img, const Params &p)`**
 Builds the target magnitude $S$, $(N/2+1) \times M$.
@@ -338,7 +340,7 @@ The bins with $f_\text{lo} \le f_k \le f_\text{hi}$, as a row range.
 **`double mel(double f)`**
 $m(f) = 2595\log_{10}(1+f/700)$.
 
-### STFT (`stft.cpp`)
+### STFT
 
 **`std::vector<double> window(const std::string &name, int N)`**
 A periodic window of length $N$:
@@ -362,7 +364,7 @@ $\hat x[n] = \sum_m w[n-mH]\,y_m[n-mH] \,/\, \sum_m w^2[n-mH]$.
 **`Image magnitude(const Spectrum &X)`**
 $|X|$ element-wise.
 
-### Phase recovery (`phase.cpp`)
+### Phase recovery
 
 **`Phase_Result griffin_lim(const Image &S, int n_fft, int hop, const std::vector<double> &win, int n_iter = 60, const std::string &init = "random", unsigned seed = 0)`**
 Each iteration computes $Y = \mathrm{STFT}(\mathrm{ISTFT}(X))$, then sets $X \leftarrow S \cdot Y/|Y|$,
@@ -371,7 +373,7 @@ which keeps $Y$'s phase and restores the target magnitudes.
   `std::mt19937`; `zero` uses $X^{(0)} = S$.
 - It returns `x` and `errs`, the spectral convergence per iteration.
 
-### Metrics (`metrics.cpp`)
+### Metrics
 
 **`double auc(const Image &target, const Image &rec)`**
 The stroke/background AUC, computed as the Mann–Whitney statistic:
@@ -390,7 +392,7 @@ $10\log_{10}(1/\mathrm{MSE})$ dB.
 **`double spectral_convergence(const Spectrum &Y, const Image &S)`**
 $\|\,|Y|-S\,\|_F / \|S\|_F$.
 
-### Files (`io.cpp`)
+### Files
 
 | Function | Does |
 |---|---|
@@ -404,7 +406,7 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | Path | Contents |
 |---|---|
 | `Makefile` | Build and pipeline targets (`make help`) |
-| `cpp/` | The library, the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
+| `cpp/` | The library (`sonocanvas.hpp` + `sonocanvas.cpp`), the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
 | `plots.py`, `app.py` | The figures and the demo page (Python) |
 | `tests/test_app.py` | The app's tests (pytest) |
 | `data/*.npz` | Experiment and video data. Figures, paper and video are drawn from these. |
