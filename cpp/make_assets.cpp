@@ -35,7 +35,7 @@ int main()
     out.add("target", e.target);
     out.add("rec", decode(e.x));
     out.add("S", e.S);
-    for (int k : {0, 1, 5, 20, 60}) out.add(std::format("gl_rec_{}", k), decode(encode(img, {}, k).x));
+    for (int k : {0, 1, 2, 5, 10, 20, 60}) out.add(std::format("gl_rec_{}", k), decode(encode(img, {}, k).x));
 
     Params p;
     p.dur = SHAPE_DUR;
