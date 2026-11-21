@@ -275,7 +275,7 @@ Types:
 
 ### Encoder and decoder (`sonocanvas.cpp`)
 
-**`Encoded encode(const Image& img, const Params& p = {}, int n_iter = 60, const std::string& init = "random", unsigned seed = 0)`**
+**`Encoded encode(const Image &img, const Params &p = {}, int n_iter = 60, const std::string &init = "random", unsigned seed = 0)`**
 Turns an image into a waveform $x$ with $|\mathrm{STFT}(x)| \approx S(I)$, peak-normalised to
 $x \leftarrow 0.9\,x/\max|x|$. `Encoded` holds:
 - `x`: the waveform;
@@ -283,29 +283,29 @@ $x \leftarrow 0.9\,x/\max|x|$. `Encoded` holds:
 - `target`: `S` on the band, flipped and divided by its max, which is the grid `decode` returns;
 - `errs`: the spectral convergence after each iteration.
 
-**`Image decode(const Signal& x, const Params& p = {})`**
+**`Image decode(const Signal &x, const Params &p = {})`**
 Turns a waveform into the image $\hat I = |\mathrm{STFT}(x)|[\text{band}]/\max$, on the target grid. It
 uses only `p`, never encoder state. Pass the same `dur` that was used to encode.
 
-**`Image band_image(const Image& mag, const Params& p)`**
+**`Image band_image(const Image &mag, const Params &p)`**
 Takes a bins × frames magnitude, keeps the band, flips it so row 0 is $f_\text{hi}$, and divides by its
 max.
 
 ### Image preparation (`image_prep.cpp`)
 
-**`Image load(const std::string& path)`**
+**`Image load(const std::string &path)`**
 Reads an 8- or 16-bit grayscale image as $[0,1]$.
 
-**`Image render_text(const std::string& text, int w = 900, int h = 260, bool fit = true)`**
+**`Image render_text(const std::string &text, int w = 900, int h = 260, bool fit = true)`**
 Draws white DejaVu Sans Bold at 170 px, centred by its ink bounding box on a black $w \times h$ canvas.
 - Text wider than $0.92\,w$ is shrunk to fit when `fit` is true.
 - When `fit` is false, the canvas is widened to $w' = \lceil \text{width}/0.92\rceil$ instead.
 
-**`double text_duration(const Image& img, int w = 900, double dur = 5.0)`**
+**`double text_duration(const Image &img, int w = 900, double dur = 5.0)`**
 Returns the clip length that keeps a widened canvas at the default time scale:
 $d\cdot\max(1, w'/w)$. Use it only for text.
 
-**`Image preprocess(const Image& img, const std::string& mode = "raw", double gamma = 1.0, int dilate = 1)`**
+**`Image preprocess(const Image &img, const std::string &mode = "raw", double gamma = 1.0, int dilate = 1)`**
 Applies point processing, then optionally extracts edges.
 1. Contrast stretch: $I' = (I-\min I)/(\max I-\min I)$.
 2. Gamma: $I'' = I'^{\gamma}$.
@@ -316,21 +316,21 @@ Applies point processing, then optionally extracts edges.
 
 It throws `std::invalid_argument` for an unknown mode.
 
-**`Image resize(const Image& img, int rows, int cols)`**
+**`Image resize(const Image &img, int rows, int cols)`**
 An anti-aliased resize, the same recipe as scikit-image's:
 1. Blur with a Gaussian of $\sigma = \max(0, (s-1)/2)$ per axis, where $s$ is the shrink factor.
 2. Interpolate bilinearly.
 
 ### Frequency map (`freq_map.cpp`)
 
-**`Image image_to_mag(const Image& img, const Params& p)`**
+**`Image image_to_mag(const Image &img, const Params &p)`**
 Builds the target magnitude $S$, $(N/2+1) \times M$.
 - The image's columns are resampled to the $M$ frames.
 - Bin $k$ at $f_k = k f_s/N$ gets the position $p_k = (f_k-f_\text{lo})/(f_\text{hi}-f_\text{lo})$,
   computed on mel values for `"mel"`.
 - $S[k,m]$ interpolates column $m$ linearly at $p_k$; bins outside the band are 0.
 
-**`cv::Range band(const Params& p)`**
+**`cv::Range band(const Params &p)`**
 The bins with $f_\text{lo} \le f_k \le f_\text{hi}$, as a row range.
 
 **`double mel(double f)`**
@@ -338,31 +338,31 @@ $m(f) = 2595\log_{10}(1+f/700)$.
 
 ### STFT (`stft.cpp`)
 
-**`std::vector<double> window(const std::string& name, int N)`**
+**`std::vector<double> window(const std::string &name, int N)`**
 A periodic window of length $N$:
 - `hann`: $\tfrac12-\tfrac12\cos(2\pi n/N)$
 - `hamming`: $0.54-0.46\cos(2\pi n/N)$
 - `blackman`: $0.42-0.5\cos(2\pi n/N)+0.08\cos(4\pi n/N)$
 - `rect`: $1$
 
-**`Spectrum stft(const Signal& x, int n_fft, int hop, const std::vector<double>& win)`**
+**`Spectrum stft(const Signal &x, int n_fft, int hop, const std::vector<double> &win)`**
 The centre-padded STFT:
 $X[k,m] = \sum_{n=0}^{N-1} x[n+mH]\,w[n]\,e^{-j2\pi kn/N}$, $k = 0..N/2$.
 - $x$ is zero-padded by $N/2$ on each side.
 - Each windowed frame is a row of a matrix, and one `cv::dft` call with `DFT_ROWS` transforms them all.
 
-**`Signal istft(const Spectrum& X, int n_fft, int hop, const std::vector<double>& win)`**
+**`Signal istft(const Spectrum &X, int n_fft, int hop, const std::vector<double> &win)`**
 Weighted overlap-add, the least-squares inverse:
 $\hat x[n] = \sum_m w[n-mH]\,y_m[n-mH] \,/\, \sum_m w^2[n-mH]$.
 - Each $y_m$ comes from one inverse `cv::dft` of the frame's packed half spectrum.
 - It returns $H(M-1)$ samples.
 
-**`Image magnitude(const Spectrum& X)`**
+**`Image magnitude(const Spectrum &X)`**
 $|X|$ element-wise.
 
 ### Phase recovery (`phase.cpp`)
 
-**`PhaseResult griffin_lim(const Image& S, int n_fft, int hop, const std::vector<double>& win, int n_iter = 60, const std::string& init = "random", unsigned seed = 0)`**
+**`Phase_Result griffin_lim(const Image &S, int n_fft, int hop, const std::vector<double> &win, int n_iter = 60, const std::string &init = "random", unsigned seed = 0)`**
 Each iteration computes $Y = \mathrm{STFT}(\mathrm{ISTFT}(X))$, then sets $X \leftarrow S \cdot Y/|Y|$,
 which keeps $Y$'s phase and restores the target magnitudes.
 - Starting point: `random` uses $X^{(0)} = S e^{j2\pi U}$, with $U$ uniform from a seeded
@@ -371,21 +371,21 @@ which keeps $Y$'s phase and restores the target magnitudes.
 
 ### Metrics (`metrics.cpp`)
 
-**`double auc(const Image& target, const Image& rec)`**
+**`double auc(const Image &target, const Image &rec)`**
 The stroke/background AUC, computed as the Mann–Whitney statistic:
 $A = P(\hat I_s > \hat I_b) + \tfrac12 P(\hat I_s = \hat I_b)$.
 - It ranks all the decoded values once, with ties sharing their average rank.
 - $A = 1$ is perfect separation, and $A = 0.5$ is none.
 
-**`Image ssim_map(const Image& a, const Image& b)`** and **`double ssim(const Image& a, const Image& b)`**
+**`Image ssim_map(const Image &a, const Image &b)`** and **`double ssim(const Image &a, const Image &b)`**
 SSIM (Wang et al. 2004), with a 7×7 box window (`cv::blur`) and sample (co)variances:
 $\frac{(2\mu_a\mu_b+C_1)(2\sigma_{ab}+C_2)}{(\mu_a^2+\mu_b^2+C_1)(\sigma_a^2+\sigma_b^2+C_2)}$.
 `ssim` is the map's mean with the 3-pixel border excluded.
 
-**`double psnr(const Image& a, const Image& b)`**
+**`double psnr(const Image &a, const Image &b)`**
 $10\log_{10}(1/\mathrm{MSE})$ dB.
 
-**`double spectral_convergence(const Spectrum& Y, const Image& S)`**
+**`double spectral_convergence(const Spectrum &Y, const Image &S)`**
 $\|\,|Y|-S\,\|_F / \|S\|_F$.
 
 ### Files (`io.cpp`)
@@ -401,6 +401,7 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | Path | Contents |
 |---|---|
 | `Makefile` | Build and pipeline targets (`make help`) |
+| `.clang-format` | C++ code style (nob.h layout); run `clang-format -i cpp/*.cpp cpp/*.hpp` |
 | `cpp/` | The library, the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
 | `plots.py`, `app.py` | The figures and the demo page (Python) |
 | `tests/test_app.py` | The app's tests (pytest) |
@@ -413,7 +414,6 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | `paper/` | `main.tex` (IEEEtran), `refs.bib`, generated `numbers.tex`, `table1.tex`, `acoustic.tex` |
 | `video/` | Manim scenes, `narration.md` (sets the timing), `render.sh`, `voice/` (your recordings) |
 | `final/` | Presentation kit (generated, not committed) |
-| `prototype/` | The original single-file Python prototype, kept for reference |
 
 ## ENVIRONMENT
 
@@ -485,7 +485,7 @@ photograph uses raw, except in the first two rows.
 
 ## SEE ALSO
 
-`ACOUSTIC_TEST.md`, `DEMO_CHECKLIST.md`, `REVIEW.md`, `paper/main.pdf`, `video/narration.md`.
+`ACOUSTIC_TEST.md`, `DEMO_CHECKLIST.md`, `paper/main.pdf`, `video/narration.md`.
 
 D. W. Griffin and J. S. Lim, "Signal estimation from modified short-time Fourier transform," *IEEE
 Trans. ASSP*, 1984. Z. Wang et al., "Image quality assessment: from error visibility to structural

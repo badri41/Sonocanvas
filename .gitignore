@@ -7,9 +7,8 @@ __pycache__/
 # Manim renders
 media/
 
-# Audio outputs (prototype reference WAVs are kept)
+# Audio outputs (the demo presets are kept)
 *.wav
-!prototype/*.wav
 !demo/*.wav
 
 # TeX intermediates (paper/main.pdf is a deliverable, not ignored)
@@ -26,7 +25,7 @@ media/
 *.mp4
 recordings/
 
-# Presentation kit (make_final.sh) and the author's voice recordings
+# Presentation kit (make final) and the author's voice recordings
 final/
 video/voice/
 build/

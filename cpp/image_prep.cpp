@@ -1,4 +1,9 @@
-// Image loading, text rendering, preprocessing and anti-aliased resizing.
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Image loading, text rendering, preprocessing and anti-aliased resizing.
+*/
 #include <cmath>
 #include <stdexcept>
 
@@ -15,7 +20,8 @@
 
 namespace sc {
 
-Image load(const std::string& path) {
+Image load(const std::string &path)
+{
     cv::Mat m = cv::imread(path, cv::IMREAD_GRAYSCALE | cv::IMREAD_ANYDEPTH);
     if (m.empty()) throw std::runtime_error("cannot read image " + path);
     Image out;
@@ -24,7 +30,8 @@ Image load(const std::string& path) {
 }
 
 // The text drawn white at `px` pixels, cropped to its ink: the bounding box of non-zero pixels.
-static cv::Mat ink(const std::string& text, int px) {
+static cv::Mat ink(const std::string &text, int px)
+{
     static cv::Ptr<cv::freetype::FreeType2> ft = [] {
         auto f = cv::freetype::createFreeType2();
         f->loadFontData(SONOCANVAS_FONT, 0);  // throws if the font is missing
@@ -36,7 +43,8 @@ static cv::Mat ink(const std::string& text, int px) {
     return box.empty() ? cv::Mat() : big(box).clone();
 }
 
-Image render_text(const std::string& text, int w, int h, bool fit) {
+Image render_text(const std::string &text, int w, int h, bool fit)
+{
     cv::Mat t = ink(text, 170);
     if (!t.empty() && t.cols > 0.92 * w) {
         if (fit) t = ink(text, int(170 * 0.92 * w / t.cols));  // shrink the font
@@ -49,9 +57,13 @@ Image render_text(const std::string& text, int w, int h, bool fit) {
     return out;
 }
 
-double text_duration(const Image& img, int w, double dur) { return dur * std::max(1.0, double(img.cols) / w); }
+double text_duration(const Image &img, int w, double dur)
+{
+    return dur * std::max(1.0, double(img.cols) / w);
+}
 
-Image preprocess(const Image& img, const std::string& mode, double gamma, int dilate) {
+Image preprocess(const Image &img, const std::string &mode, double gamma, int dilate)
+{
     Image out;
     cv::normalize(img, out, 0, 1, cv::NORM_MINMAX);  // a constant image becomes all zeros
     cv::pow(out, gamma, out);
@@ -65,19 +77,20 @@ Image preprocess(const Image& img, const std::string& mode, double gamma, int di
     double gmax;
     cv::minMaxLoc(g, nullptr, &gmax);
     cv::Mat edges = g > 0.25 * gmax;  // 0 or 255
-    if (dilate > 0)
-        cv::dilate(edges, edges, cv::getStructuringElement(cv::MORPH_CROSS, {3, 3}), {-1, -1}, dilate);
+    if (dilate > 0) cv::dilate(edges, edges, cv::getStructuringElement(cv::MORPH_CROSS, {3, 3}), {-1, -1}, dilate);
     edges.convertTo(out, CV_64F, 1.0 / 255);
     return out;
 }
 
-// 1-D Gaussian kernel with radius \lfloor 4\sigma + 1/2 \rfloor; the identity when \sigma = 0.
-static cv::Mat gaussian(double sigma) {
+// 1-D Gaussian kernel with radius floor(4*sigma + 1/2); the identity when sigma = 0.
+static cv::Mat gaussian(double sigma)
+{
     if (sigma <= 0) return cv::Mat::ones(1, 1, CV_64F);
     return cv::getGaussianKernel(2 * int(4 * sigma + 0.5) + 1, sigma, CV_64F);
 }
 
-Image resize(const Image& img, int rows, int cols) {
+Image resize(const Image &img, int rows, int cols)
+{
     double sy = std::max(0.0, (double(img.rows) / rows - 1) / 2);
     double sx = std::max(0.0, (double(img.cols) / cols - 1) / 2);
     Image blurred, out;

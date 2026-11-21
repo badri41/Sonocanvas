@@ -1,4 +1,9 @@
-// Map an image onto a target STFT magnitude.
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Map an image onto a target STFT magnitude.
+*/
 #include <cmath>
 #include <stdexcept>
 
@@ -6,16 +11,21 @@
 
 namespace sc {
 
-double mel(double f) { return 2595 * std::log10(1 + f / 700); }
+double mel(double f)
+{
+    return 2595 * std::log10(1 + f / 700);
+}
 
 // Normalised position of frequency f between f_lo (0) and f_hi (1) on the chosen axis.
-static double position(double f, const Params& p) {
+static double position(double f, const Params &p)
+{
     if (p.scale == "mel") return (mel(f) - mel(p.f_lo)) / (mel(p.f_hi) - mel(p.f_lo));
     if (p.scale == "linear") return (f - p.f_lo) / (p.f_hi - p.f_lo);
     throw std::invalid_argument("unknown scale " + p.scale);
 }
 
-cv::Range band(const Params& p) {
+cv::Range band(const Params &p)
+{
     int first = -1, last = -1;
     for (int k = 0; k <= p.n_fft / 2; ++k) {
         double q = position(k * double(p.sr) / p.n_fft, p);
@@ -27,7 +37,8 @@ cv::Range band(const Params& p) {
     return {first, last + 1};
 }
 
-Image image_to_mag(const Image& img, const Params& p) {
+Image image_to_mag(const Image &img, const Params &p)
+{
     Image im = resize(img, img.rows, p.frames());
     cv::flip(im, im, 0);  // row 0 is now the lowest frequency
 

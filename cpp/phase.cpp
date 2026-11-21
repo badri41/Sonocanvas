@@ -1,4 +1,9 @@
-// Phase recovery by Griffin-Lim alternating projections.
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Phase recovery by Griffin-Lim alternating projections.
+*/
 #include <numbers>
 #include <random>
 #include <stdexcept>
@@ -7,8 +12,9 @@
 
 namespace sc {
 
-PhaseResult griffin_lim(const Image& S, int N, int H, const std::vector<double>& w, int n_iter,
-                        const std::string& init, unsigned seed) {
+Phase_Result griffin_lim(const Image &S, int N, int H, const std::vector<double> &w, int n_iter,
+                         const std::string &init, unsigned seed)
+{
     if (init != "random" && init != "zero") throw std::invalid_argument("unknown init " + init);
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> U(0.0, 1.0);
@@ -19,7 +25,7 @@ PhaseResult griffin_lim(const Image& S, int N, int H, const std::vector<double>&
             X(k, m) = init == "random" ? std::polar(S(k, m), 2 * std::numbers::pi * U(rng))
                                        : std::complex<double>(S(k, m), 0.0);
 
-    PhaseResult out;
+    Phase_Result out;
     for (int i = 0; i < n_iter; ++i) {
         Spectrum Y = stft(istft(X, N, H, w), N, H, w).colRange(0, S.cols);  // project onto real sounds
         out.errs.push_back(spectral_convergence(Y, S));

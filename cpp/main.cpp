@@ -1,11 +1,16 @@
-// Command-line tool.
-//
-//   bin/sonocanvas encode TEXT -o OUT.wav [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
-//   bin/sonocanvas decode IN.wav TEXT     [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
-//
-// encode writes the WAV; decode scores an existing WAV against the picture TEXT (or --image) would make.
-// Both print AUC, SSIM and PSNR. --png writes the answer key (target above decoded); --npz writes
-// target, rec and the scores for other programs (the demo app reads it).
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Command-line tool.
+
+  bin/sonocanvas encode TEXT -o OUT.wav [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
+  bin/sonocanvas decode IN.wav TEXT     [--image FILE] [--mode edges|raw] [--fixed-font] [--png F] [--npz F]
+
+encode writes the WAV; decode scores an existing WAV against the picture TEXT (or --image) would make.
+Both print AUC, SSIM and PSNR. --png writes the answer key (target above decoded); --npz writes
+target, rec and the scores for other programs (the demo app reads it).
+*/
 #include <format>
 #include <print>
 
@@ -13,12 +18,13 @@
 
 #include "sonocanvas.hpp"
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     CLI::App app{"Hide a picture in the spectrogram of a WAV file, or score a WAV against one."};
     app.require_subcommand(1);
     std::string text, image, mode = "edges", wav, png, npz;
     bool fixed_font = false;
-    for (CLI::App* sub : {app.add_subcommand("encode", "encode TEXT (or --image) into a WAV"),
+    for (CLI::App *sub : {app.add_subcommand("encode", "encode TEXT (or --image) into a WAV"),
                           app.add_subcommand("decode", "score the WAV IN against TEXT (or --image)")}) {
         if (sub->get_name() == "decode") sub->add_option("IN", wav, "WAV file to decode")->required();
         sub->add_option("TEXT", text, "text to draw");
@@ -35,7 +41,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    sc::Image img = sc::preprocess(image.empty() ? sc::render_text(text, 900, 260, !fixed_font) : sc::load(image), mode);
+    sc::Image img =
+        sc::preprocess(image.empty() ? sc::render_text(text, 900, 260, !fixed_font) : sc::load(image), mode);
     double brightest;
     cv::minMaxLoc(img, nullptr, &brightest);
     if (brightest == 0) {
@@ -66,7 +73,8 @@ int main(int argc, char** argv) {
     sc::Image rec = sc::decode(x, p);
     double a = sc::auc(target, rec), s = sc::ssim(target, rec), q = sc::psnr(target, rec);
 
-    std::print("{} ({:.2f} s @ {} Hz)  AUC={:.4f}  SSIM={:.4f}  PSNR={:.2f} dB", wav, x.size() / double(p.sr), p.sr, a, s, q);
+    std::print("{} ({:.2f} s @ {} Hz)  AUC={:.4f}  SSIM={:.4f}  PSNR={:.2f} dB", wav, x.size() / double(p.sr), p.sr, a,
+               s, q);
     std::println("{}", sc_err >= 0 ? std::format("  SC={:.4f}", sc_err) : "");
     if (!png.empty())
         sc::save_figure(png, target, rec, std::format("target, 1-8 kHz over {:.1f} s", p.dur),

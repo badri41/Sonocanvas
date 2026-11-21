@@ -1,15 +1,20 @@
-// The six controlled experiments of the paper.
-//
-//   bin/experiments                     # all six
-//   bin/experiments noise_robustness    # one (or several) by name
-//
-// Each experiment writes data/<name>.npz (read by plots.py and paper/make_numbers) and replaces its
-// rows in results/table.csv: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR.
-// Means and population standard deviations are over five seeds (Griffin-Lim or noise seeds).
-//
-// Test images: text = render_text("DA321"); line = the CC0 horse silhouette, whose edges form the
-// line drawing; photo = the CC0 cat (data/images/). Unless an experiment varies it, text and line use
-// mode "edges" and photo uses "raw".
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+The six controlled experiments of the paper.
+
+  bin/experiments                     # all six
+  bin/experiments noise_robustness    # one (or several) by name
+
+Each experiment writes data/<name>.npz (read by plots.py and paper/make_numbers) and replaces its
+rows in results/table.csv: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR.
+Means and population standard deviations are over five seeds (Griffin-Lim or noise seeds).
+
+Test images: text = render_text("DA321"); line = the CC0 horse silhouette, whose edges form the
+line drawing; photo = the CC0 cat (data/images/). Unless an experiment varies it, text and line use
+mode "edges" and photo uses "raw".
+*/
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -36,49 +41,63 @@ const std::map<std::string, std::string> MODE = {{"text", "edges"}, {"line", "ed
 constexpr int SR = 22050;
 constexpr double F_LO = 1000, F_HI = 8000, C1 = 0.01 * 0.01, C2 = 0.03 * 0.03;
 
-// ---- helpers -----------------------------------------------------------------------------
+// helpers
 
-double mean(const std::vector<double>& v) {
+double mean(const std::vector<double> &v)
+{
     double s = 0;
     for (double x : v) s += x;
     return s / v.size();
 }
 
-double stdev(const std::vector<double>& v) {  // population standard deviation
+double stdev(const std::vector<double> &v)
+{  // population standard deviation
     double m = mean(v), s = 0;
     for (double x : v) s += (x - m) * (x - m);
     return std::sqrt(s / v.size());
 }
 
 // Mean of m over the pixels where mask is non-zero; NaN when there are none.
-double masked_mean(const Image& m, const cv::Mat& mask) {
+double masked_mean(const Image &m, const cv::Mat &mask)
+{
     return cv::countNonZero(mask) ? cv::mean(m, mask)[0] : NAN;
 }
 
-Image clip01(const Image& m) {
+Image clip01(const Image &m)
+{
     Image out = cv::max(cv::min(m, 1.0), 0.0);
     return out;
 }
 
 // Rows of equal length, flattened, with their shape: for 2-D arrays in the .npz.
-struct Table2D {
+struct Table_2D {
     std::vector<double> data;
     std::vector<size_t> shape;
 };
-Table2D stack(const std::vector<std::vector<double>>& rows) {
-    Table2D t{{}, {rows.size(), rows.empty() ? 0 : rows[0].size()}};
-    for (const auto& r : rows) t.data.insert(t.data.end(), r.begin(), r.end());
+Table_2D stack(const std::vector<std::vector<double>> &rows)
+{
+    Table_2D t{{}, {rows.size(), rows.empty() ? 0 : rows[0].size()}};
+    for (const auto &r : rows) t.data.insert(t.data.end(), r.begin(), r.end());
     return t;
 }
 
-Row row(const std::string& exp, const std::string& image, const std::string& param,
-        const std::vector<double>& ssims, const std::vector<double>& psnrs, const std::vector<double>& aucs) {
-    return {exp, image, param, std::format("{:.4f}", mean(aucs)), std::format("{:.4f}", stdev(aucs)),
-            std::format("{:.4f}", mean(ssims)), std::format("{:.4f}", stdev(ssims)), std::format("{:.2f}", mean(psnrs))};
+Row row(const std::string &exp, const std::string &image, const std::string &param, const std::vector<double> &ssims,
+        const std::vector<double> &psnrs, const std::vector<double> &aucs)
+{
+    return {exp,
+            image,
+            param,
+            std::format("{:.4f}", mean(aucs)),
+            std::format("{:.4f}", stdev(aucs)),
+            std::format("{:.4f}", mean(ssims)),
+            std::format("{:.4f}", stdev(ssims)),
+            std::format("{:.2f}", mean(psnrs))};
 }
 
-std::map<std::string, Image> base_images() {
-    return {{"text", render_text("DA321")}, {"line", load("data/images/horse.png")},
+std::map<std::string, Image> base_images()
+{
+    return {{"text", render_text("DA321")},
+            {"line", load("data/images/horse.png")},
             {"photo", load("data/images/chelsea.png")}};
 }
 
@@ -95,8 +114,9 @@ struct Trial {
     Image rec;                              // seed 0
 };
 
-Trial trial(const Image& img, const Params& p = {}, int n_iter = 60, const std::string& init = "random",
-            const std::vector<unsigned>& seeds = SEEDS, const std::map<std::string, Image>& refs = {}) {
+Trial trial(const Image &img, const Params &p = {}, int n_iter = 60, const std::string &init = "random",
+            const std::vector<unsigned> &seeds = SEEDS, const std::map<std::string, Image> &refs = {})
+{
     Trial t;
     for (unsigned s : seeds) {
         Encoded e = encode(img, p, n_iter, init, s);
@@ -104,7 +124,7 @@ Trial trial(const Image& img, const Params& p = {}, int n_iter = 60, const std::
         t.own.ssim.push_back(ssim(e.target, rec));
         t.own.psnr.push_back(psnr(e.target, rec));
         t.own.auc.push_back(auc(e.target, rec));
-        for (const auto& [k, ref] : refs) {
+        for (const auto &[k, ref] : refs) {
             Image r2 = clip01(resize(rec, ref.rows, ref.cols));
             t.ref[k].ssim.push_back(ssim(ref, r2));
             t.ref[k].psnr.push_back(psnr(ref, r2));
@@ -119,17 +139,18 @@ Trial trial(const Image& img, const Params& p = {}, int n_iter = 60, const std::
     return t;
 }
 
-// What SSIM does over flat target regions: 7x7 windows with \sigma_T^2 < C_2 (border excluded).
-// frac: share of such windows. var: mean \sigma_R^2. lum: mean luminance term l. ssim, rest: mean SSIM
-// map on and off them. pred: mean of l C_2/(\sigma_R^2 + C_2), the flat-target approximation.
-std::map<std::string, double> flat_stats(const Image& target, const Image& rec) {
+// What SSIM does over flat target regions: 7x7 windows with sigma_T^2 < C2 (border excluded).
+// frac: share of such windows. var: mean sigma_R^2. lum: mean luminance term l. ssim, rest: mean SSIM
+// map on and off them. pred: mean of l*C2/(sigma_R^2 + C2), the flat-target approximation.
+std::map<std::string, double> flat_stats(const Image &target, const Image &rec)
+{
     Image smap = ssim_map(target, rec);
-    auto avg = [](const Image& m) {
+    auto avg = [](const Image &m) {
         Image o;
         cv::blur(m, o, {7, 7}, {-1, -1}, cv::BORDER_REFLECT);
         return o;
     };
-    auto var = [&](const Image& m) { return Image((avg(m.mul(m)) - avg(m).mul(avg(m))) * 49.0 / 48.0); };
+    auto var = [&](const Image &m) { return Image((avg(m.mul(m)) - avg(m).mul(avg(m))) * 49.0 / 48.0); };
     Image mt = avg(target), mr = avg(rec), vr = var(rec);
     cv::Mat body = cv::Mat::zeros(target.size(), CV_8U);
     body(cv::Rect(3, 3, target.cols - 6, target.rows - 6)) = 255;
@@ -137,19 +158,22 @@ std::map<std::string, double> flat_stats(const Image& target, const Image& rec) 
     Image lum = (2 * mt.mul(mr) + C1) / (mt.mul(mt) + mr.mul(mr) + C1);
     Image pred = lum.mul(C2 / (vr + C2));
     return {{"flat_frac", double(cv::countNonZero(flat)) / cv::countNonZero(body)},
-            {"flat_var", masked_mean(vr, flat)}, {"flat_lum", masked_mean(lum, flat)},
-            {"flat_ssim", masked_mean(smap, flat)}, {"rest_ssim", masked_mean(smap, body & ~flat)},
+            {"flat_var", masked_mean(vr, flat)},
+            {"flat_lum", masked_mean(lum, flat)},
+            {"flat_ssim", masked_mean(smap, flat)},
+            {"rest_ssim", masked_mean(smap, body & ~flat)},
             {"flat_pred", masked_mean(pred, flat)}};
 }
 
 // Separates what SSIM measures on a decoded image.
 //   support: mean SSIM map over the target's lit pixels dilated by 3 (excludes black background).
 //   ls_gain: SSIM after the least-squares gain g = <T,R>/<R,R>, undoing the max-normalisation bias.
-//   cv: \sigma/\mu of the decoded image on pixels with T > 0.5 (speckle strength).
-//   interior: mean SSIM map where the whole 7x7 window is lit (\sigma_T \approx 0). There
-//   SSIM \approx l C_2/(\sigma_R^2 + C_2); interior_pred evaluates that from the measured \mu_R, \sigma_R.
+//   cv: sigma/mu of the decoded image on pixels with T > 0.5 (speckle strength).
+//   interior: mean SSIM map where the whole 7x7 window is lit (sigma_T ~ 0). There
+//   SSIM ~ l*C2/(sigma_R^2 + C2); interior_pred evaluates that from the measured mu_R, sigma_R.
 //   NaN when no such window exists (thin edges).
-std::map<std::string, double> diagnostics(const Image& target, const Image& rec) {
+std::map<std::string, double> diagnostics(const Image &target, const Image &rec)
+{
     Image smap = ssim_map(target, rec);
     cv::Mat sup, core, lit = target > 0.5;
     cv::dilate(target > 0.01, sup, cv::getStructuringElement(cv::MORPH_CROSS, {3, 3}), {-1, -1}, 3);
@@ -165,17 +189,23 @@ std::map<std::string, double> diagnostics(const Image& target, const Image& rec)
     cv::Scalar lit_mu, lit_sd;
     cv::meanStdDev(rec, lit_mu, lit_sd, lit);
     double n = double(target.total());
-    return {{"support", masked_mean(smap, sup)}, {"interior", interior}, {"interior_pred", pred},
-            {"gain", g}, {"ls_gain", ssim(target, clip01(g * rec))}, {"cv", lit_sd[0] / lit_mu[0]},
-            {"lit_frac", cv::countNonZero(lit) / n}, {"support_frac", cv::countNonZero(sup) / n}};
+    return {{"support", masked_mean(smap, sup)},
+            {"interior", interior},
+            {"interior_pred", pred},
+            {"gain", g},
+            {"ls_gain", ssim(target, clip01(g * rec))},
+            {"cv", lit_sd[0] / lit_mu[0]},
+            {"lit_frac", cv::countNonZero(lit) / n},
+            {"support_frac", cv::countNonZero(sup) / n}};
 }
 
-// ---- 1. edges vs filled ------------------------------------------------------------------
+// 1. edges vs filled
 
-std::vector<Row> edges_vs_filled(std::map<std::string, Image>& imgs) {
+std::vector<Row> edges_vs_filled(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/edges_vs_filled.npz");
-    for (const auto& n : NAMES)
+    for (const auto &n : NAMES)
         for (std::string mode : {"raw", "edges"}) {
             Trial t = trial(preprocess(imgs[n], mode));
             rows.push_back(row("edges_vs_filled", n, mode, t.own.ssim, t.own.psnr, t.own.auc));
@@ -191,23 +221,24 @@ std::vector<Row> edges_vs_filled(std::map<std::string, Image>& imgs) {
             out.add(key + "ssim", mean(t.own.ssim));
             out.add(key + "auc", mean(t.own.auc));
             out.add(key + "energy", energy);
-            for (const auto& [k, v] : d) out.add(key + k, v);
+            for (const auto &[k, v] : d) out.add(key + k, v);
         }
     return rows;
 }
 
-// ---- 2. window length --------------------------------------------------------------------
+// 2. window length
 // Own-grid SSIM scores each N against a different target, so it is not comparable across N. The
 // image-grid score compares every decoded image with the original on one fixed grid; "half" repeats
 // this at half resolution to show that the ranking does not depend on the grid.
 
 const std::vector<int> LENGTHS = {128, 256, 512, 1024, 2048, 4096};
 
-std::vector<Row> sweep_window_len(std::map<std::string, Image>& imgs) {
+std::vector<Row> sweep_window_len(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/sweep_window_len.npz");
     out.add("lengths", LENGTHS);
-    for (const auto& n : NAMES) {
+    for (const auto &n : NAMES) {
         Image img = preprocess(imgs[n], MODE.at(n));
         Image full = resize(img, 260, 900);
         std::map<std::string, Image> refs = {{"image", full}, {"half", resize(img, 130, 450)}};
@@ -218,17 +249,19 @@ std::vector<Row> sweep_window_len(std::map<std::string, Image>& imgs) {
             p.hop = N / 4;
             Trial t = trial(img, p, 60, "random", SEEDS, refs);
             for (std::string k : {"own", "image", "half"}) {
-                const Scores& s = k == "own" ? t.own : t.ref[k];
+                const Scores &s = k == "own" ? t.own : t.ref[k];
                 rows.push_back(row("sweep_window_len", n, std::format("N={}/{}", N, k), s.ssim, s.psnr, s.auc));
                 ssims[k].push_back(s.ssim);
                 aucs[k].push_back(s.auc);
             }
-            for (const auto& [k, v] : flat_stats(full, t.ref_rec["image"])) out.add(std::format("{}_{}_{}", n, k, N), v);
-            for (const auto& [k, v] : flat_stats(t.first.target, t.rec)) out.add(std::format("{}_own_{}_{}", n, k, N), v);
+            for (const auto &[k, v] : flat_stats(full, t.ref_rec["image"]))
+                out.add(std::format("{}_{}_{}", n, k, N), v);
+            for (const auto &[k, v] : flat_stats(t.first.target, t.rec))
+                out.add(std::format("{}_own_{}_{}", n, k, N), v);
             if (n == "text") out.add(std::format("text_rec_{}", N), t.ref_rec["image"]);
         }
         for (std::string k : {"own", "image", "half"}) {
-            Table2D s = stack(ssims[k]), a = stack(aucs[k]);
+            Table_2D s = stack(ssims[k]), a = stack(aucs[k]);
             out.add(n + "_" + k, s.data, s.shape);
             out.add(n + "_" + k + "_auc", a.data, a.shape);
         }
@@ -236,28 +269,30 @@ std::vector<Row> sweep_window_len(std::map<std::string, Image>& imgs) {
     return rows;
 }
 
-// ---- 3. window shape ---------------------------------------------------------------------
+// 3. window shape
 
 const std::vector<std::string> WINDOWS = {"rect", "hann", "hamming", "blackman"};
 
 // |W(f)| in dB relative to its peak on bins [0, 12) at 1/pad resolution, and the highest sidelobe (dB).
-struct WindowSpectrum {
+struct Window_Spectrum {
     std::vector<double> bins, db;
     double sidelobe;
 };
-WindowSpectrum window_spectrum(const std::string& name, int N = 1024, int pad = 32) {
+Window_Spectrum window_spectrum(const std::string &name, int N = 1024, int pad = 32)
+{
     cv::Mat w = cv::Mat::zeros(1, N * pad, CV_64F), F;
     std::vector<double> win = window(name, N);
     for (int n = 0; n < N; ++n) w.at<double>(0, n) = win[n];
     cv::dft(w, F, cv::DFT_COMPLEX_OUTPUT);
     std::vector<double> mag(N * pad / 2 + 1), db(mag.size());
-    for (size_t k = 0; k < mag.size(); ++k) mag[k] = std::abs(std::complex<double>(F.at<cv::Vec2d>(0, k)[0], F.at<cv::Vec2d>(0, k)[1]));
+    for (size_t k = 0; k < mag.size(); ++k)
+        mag[k] = std::abs(std::complex<double>(F.at<cv::Vec2d>(0, k)[0], F.at<cv::Vec2d>(0, k)[1]));
     double peak = *std::max_element(mag.begin(), mag.end());
     for (size_t k = 0; k < mag.size(); ++k) db[k] = 20 * std::log10(std::max(mag[k] / peak, 1e-8));
     size_t first_null = 0;  // end of the main lobe: the first bin where the response rises again
     while (first_null + 1 < db.size() && !(db[first_null + 1] > db[first_null])) ++first_null;
     if (first_null + 1 == db.size()) first_null = 0;
-    WindowSpectrum ws{{}, {}, *std::max_element(db.begin() + first_null, db.end())};
+    Window_Spectrum ws{{}, {}, *std::max_element(db.begin() + first_null, db.end())};
     for (int i = 0; i < 12 * pad; ++i) {
         ws.bins.push_back(double(i) / pad);
         ws.db.push_back(db[i]);
@@ -265,56 +300,59 @@ WindowSpectrum window_spectrum(const std::string& name, int N = 1024, int pad = 
     return ws;
 }
 
-std::vector<Row> sweep_window_type(std::map<std::string, Image>& imgs) {
+std::vector<Row> sweep_window_type(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/sweep_window_type.npz");
-    for (const auto& w : WINDOWS) {
-        WindowSpectrum ws = window_spectrum(w);
+    for (const auto &w : WINDOWS) {
+        Window_Spectrum ws = window_spectrum(w);
         out.add(w + "_bins", ws.bins);
         out.add(w + "_db", ws.db);
         out.add(w + "_sidelobe_db", ws.sidelobe);
-        for (const auto& n : NAMES) {
+        for (const auto &n : NAMES) {
             Params p;
             p.window = w;
             Trial t = trial(preprocess(imgs[n], MODE.at(n)), p);
             rows.push_back(row("sweep_window_type", n, w, t.own.ssim, t.own.psnr, t.own.auc));
             out.add(n + "_" + w + "_ssim", t.own.ssim);
             out.add(n + "_" + w + "_auc", t.own.auc);
-            for (const auto& [k, v] : flat_stats(t.first.target, t.rec)) out.add(n + "_" + w + "_" + k, v);
+            for (const auto &[k, v] : flat_stats(t.first.target, t.rec)) out.add(n + "_" + w + "_" + k, v);
             if (n == "text") out.add("text_" + w + "_rec", t.rec);
         }
     }
     return rows;
 }
 
-// ---- 4. Griffin-Lim iterations -----------------------------------------------------------
-// n_iter = 0 is random phase only: x = ISTFT(S e^{j\phi}), with no projection step.
+// 4. Griffin-Lim iterations
+// n_iter = 0 is random phase only: x = ISTFT(S*exp(j*phi)), with no projection step.
 
 const std::vector<int> ITERS = {0, 1, 2, 5, 10, 20, 60, 100, 200};
-constexpr int CURVE_LEN = 201;  // errs[i] is the error of X^{(i)}, so i = 0..200 needs 201 passes
+constexpr int CURVE_LEN = 201;  // errs[i] is the error of X_i, so i = 0..200 needs 201 passes
 
-std::vector<Row> gl_iterations(std::map<std::string, Image>& imgs) {
+std::vector<Row> gl_iterations(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/gl_iterations.npz");
     out.add("iters", ITERS);
-    for (const auto& n : NAMES) {
+    for (const auto &n : NAMES) {
         Image img = preprocess(imgs[n], MODE.at(n));
         std::vector<std::vector<double>> curves;
         for (unsigned s : SEEDS) curves.push_back(trial(img, {}, CURVE_LEN, "random", {s}).first.errs);
-        Table2D c = stack(curves);
+        Table_2D c = stack(curves);
         out.add(n + "_errs_random", c.data, c.shape);
         out.add(n + "_errs_zero", trial(img, {}, CURVE_LEN, "zero", {0}).first.errs);
         std::vector<std::vector<double>> ssim_r, auc_r;
         std::vector<double> ssim_z;
         for (int k : ITERS) {
             Trial r = trial(img, {}, k), z = trial(img, {}, k, "zero", {0});
-            rows.push_back(row("gl_iterations", n, std::format("random/iter={}", k), r.own.ssim, r.own.psnr, r.own.auc));
+            rows.push_back(
+                row("gl_iterations", n, std::format("random/iter={}", k), r.own.ssim, r.own.psnr, r.own.auc));
             rows.push_back(row("gl_iterations", n, std::format("zero/iter={}", k), z.own.ssim, z.own.psnr, z.own.auc));
             ssim_r.push_back(r.own.ssim);
             auc_r.push_back(r.own.auc);
             ssim_z.push_back(z.own.ssim[0]);
         }
-        Table2D s = stack(ssim_r), a = stack(auc_r);
+        Table_2D s = stack(ssim_r), a = stack(auc_r);
         out.add(n + "_ssim_random", s.data, s.shape);
         out.add(n + "_ssim_zero", ssim_z);
         out.add(n + "_auc_random", a.data, a.shape);
@@ -322,13 +360,18 @@ std::vector<Row> gl_iterations(std::map<std::string, Image>& imgs) {
     return rows;
 }
 
-// ---- 5. mel vs linear --------------------------------------------------------------------
+// 5. mel vs linear
 
-double mel_inv(double m) { return 700 * (std::pow(10.0, m / 2595) - 1); }  // f(m) = 700 (10^{m/2595} - 1)
+// f(m) = 700*(10^(m/2595) - 1), the inverse of mel()
+double mel_inv(double m)
+{
+    return 700 * (std::pow(10.0, m / 2595) - 1);
+}
 
-// Redraw a bins x frames decoded image on a viewer axis: viewer row r \in [0,1] (bottom to top) shows
+// Redraw a bins x frames decoded image on a viewer axis: viewer row r in [0,1] (bottom to top) shows
 // frequency f(r), linearly interpolated between the band's bins (edge values held outside).
-Image view(const Image& rec, const std::string& scale, int n_fft = 1024) {
+Image view(const Image &rec, const std::string &scale, int n_fft = 1024)
+{
     double df = double(SR) / n_fft, f0 = std::ceil(F_LO / df) * df;  // first band bin
     Image out(rec.size());
     int R = rec.rows;
@@ -345,10 +388,11 @@ Image view(const Image& rec, const std::string& scale, int n_fft = 1024) {
     return clip01(out);
 }
 
-std::vector<Row> mel_vs_linear(std::map<std::string, Image>& imgs) {
+std::vector<Row> mel_vs_linear(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/mel_vs_linear.npz");
-    for (const auto& n : NAMES) {
+    for (const auto &n : NAMES) {
         Image img = preprocess(imgs[n], MODE.at(n));
         for (std::string enc : {"linear", "mel"}) {
             Params p;
@@ -371,28 +415,31 @@ std::vector<Row> mel_vs_linear(std::map<std::string, Image>& imgs) {
     return rows;
 }
 
-// ---- 6. noise ----------------------------------------------------------------------------
-// SNR = 10 \log_{10}(\sum x^2 / \sum n^2). Relative noise holds SNR fixed per signal. A loudspeaker
+// 6. noise
+// SNR = 10*log10(sum x^2 / sum n^2). Relative noise holds SNR fixed per signal. A loudspeaker
 // instead fixes peak amplitude and the room fixes the noise floor, so for text the "floor" series
-// gives raw and edges the same absolute \sigma, chosen so that raw sits at the nominal SNR.
+// gives raw and edges the same absolute sigma, chosen so that raw sits at the nominal SNR.
 
 const std::vector<int> SNRS = {30, 20, 10, 5, 0};
 
-double sigma_for(const Signal& x, double snr) {
+double sigma_for(const Signal &x, double snr)
+{
     double p = 0;
     for (double v : x) p += v * v;
     return std::sqrt(p / x.size() / std::pow(10.0, snr / 10));
 }
 
-Signal noisy(const Signal& x, double sigma, unsigned seed) {
+Signal noisy(const Signal &x, double sigma, unsigned seed)
+{
     std::mt19937 rng(seed);
     std::normal_distribution<double> g;
     Signal y = x;
-    for (double& v : y) v += sigma * g(rng);
+    for (double &v : y) v += sigma * g(rng);
     return y;
 }
 
-Scores noisy_scores(const Signal& x, const Image& target, double sigma) {
+Scores noisy_scores(const Signal &x, const Image &target, double sigma)
+{
     Scores s;
     for (unsigned seed : SEEDS) {
         Image rec = decode(noisy(x, sigma, 100 + seed));
@@ -403,16 +450,17 @@ Scores noisy_scores(const Signal& x, const Image& target, double sigma) {
     return s;
 }
 
-std::vector<Row> noise_robustness(std::map<std::string, Image>& imgs) {
+std::vector<Row> noise_robustness(std::map<std::string, Image> &imgs)
+{
     std::vector<Row> rows;
     Npz out("data/noise_robustness.npz");
     out.add("snrs", SNRS);
     std::map<std::string, Encoded> enc;  // key "image/mode"
-    for (const auto& n : NAMES)
+    for (const auto &n : NAMES)
         for (std::string mode : {"raw", "edges"}) enc[n + "/" + mode] = encode(preprocess(imgs[n], mode));
-    auto series = [&](const std::string& n, const std::string& mode, const Signal& level_of,
-                      const std::string& tag, const std::string& key) {
-        const Encoded& e = enc[n + "/" + mode];
+    auto series = [&](const std::string &n, const std::string &mode, const Signal &level_of, const std::string &tag,
+                      const std::string &key) {
+        const Encoded &e = enc[n + "/" + mode];
         std::vector<std::vector<double>> ss, us;
         for (int snr : SNRS) {
             Scores s = noisy_scores(e.x, e.target, sigma_for(level_of, snr));
@@ -420,29 +468,31 @@ std::vector<Row> noise_robustness(std::map<std::string, Image>& imgs) {
             ss.push_back(s.ssim);
             us.push_back(s.auc);
         }
-        Table2D a = stack(ss), b = stack(us);
+        Table_2D a = stack(ss), b = stack(us);
         out.add(key + "ssim", a.data, a.shape);
         out.add(key + "auc", b.data, b.shape);
     };
-    for (const auto& n : NAMES)
+    for (const auto &n : NAMES)
         for (std::string mode : {"raw", "edges"}) series(n, mode, enc[n + "/" + mode].x, "snr", n + "_" + mode + "_");
     for (int snr : SNRS) {
-        const Signal& x = enc["text/edges"].x;
+        const Signal &x = enc["text/edges"].x;
         out.add(std::format("text_edges_rec_{}", snr), decode(noisy(x, sigma_for(x, snr), 100)));
     }
-    for (std::string mode : {"raw", "edges"}) series("text", mode, enc["text/raw"].x, "floor", "text_" + mode + "_floor_");
+    for (std::string mode : {"raw", "edges"})
+        series("text", mode, enc["text/raw"].x, "floor", "text_" + mode + "_floor_");
     return rows;
 }
 
-// ---- table and main ----------------------------------------------------------------------
+// table and main
 
-using Experiment = std::function<std::vector<Row>(std::map<std::string, Image>&)>;
+using Experiment = std::function<std::vector<Row>(std::map<std::string, Image> &)>;
 const std::vector<std::pair<std::string, Experiment>> EXPERIMENTS = {
-    {"edges_vs_filled", edges_vs_filled}, {"sweep_window_len", sweep_window_len},
+    {"edges_vs_filled", edges_vs_filled},     {"sweep_window_len", sweep_window_len},
     {"sweep_window_type", sweep_window_type}, {"gl_iterations", gl_iterations},
-    {"mel_vs_linear", mel_vs_linear}, {"noise_robustness", noise_robustness}};
+    {"mel_vs_linear", mel_vs_linear},         {"noise_robustness", noise_robustness}};
 
-std::vector<std::string> split(const std::string& line) {
+std::vector<std::string> split(const std::string &line)
+{
     std::vector<std::string> f;
     std::stringstream ss(line);
     for (std::string x; std::getline(ss, x, ',');) f.push_back(x);
@@ -451,7 +501,8 @@ std::vector<std::string> split(const std::string& line) {
 }
 
 // Replace the rows of the experiments just run, keeping the file in experiment order.
-void update_table(const std::map<std::string, std::vector<Row>>& fresh) {
+void update_table(const std::map<std::string, std::vector<Row>> &fresh)
+{
     const std::string path = "results/table.csv";
     std::vector<Row> rows;
     std::ifstream in(path);
@@ -459,26 +510,27 @@ void update_table(const std::map<std::string, std::vector<Row>>& fresh) {
     std::getline(in, line);  // header
     while (std::getline(in, line))
         if (Row r = split(line); !r.empty() && !fresh.contains(r[0])) rows.push_back(r);
-    for (const auto& [name, rs] : fresh) rows.insert(rows.end(), rs.begin(), rs.end());
-    auto order = [](const std::string& e) {
+    for (const auto &[name, rs] : fresh) rows.insert(rows.end(), rs.begin(), rs.end());
+    auto order = [](const std::string &e) {
         for (size_t i = 0; i < EXPERIMENTS.size(); ++i)
             if (EXPERIMENTS[i].first == e) return i;
         return EXPERIMENTS.size();
     };
-    std::stable_sort(rows.begin(), rows.end(), [&](const Row& a, const Row& b) { return order(a[0]) < order(b[0]); });
+    std::stable_sort(rows.begin(), rows.end(), [&](const Row &a, const Row &b) { return order(a[0]) < order(b[0]); });
     std::ofstream f(path);
     f << "experiment,image,param,auc,auc_std,ssim,ssim_std,psnr_db\n";
-    for (const Row& r : rows) {
+    for (const Row &r : rows) {
         for (size_t i = 0; i < r.size(); ++i) f << (i ? "," : "") << r[i];
         f << "\n";
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     CLI::App app{"Run the SonoCanvas experiments."};
     std::vector<std::string> names;
     std::vector<std::string> all;
-    for (const auto& [n, f] : EXPERIMENTS) all.push_back(n);
+    for (const auto &[n, f] : EXPERIMENTS) all.push_back(n);
     app.add_option("names", names, "experiments to run (default: all)")->check(CLI::IsMember(all));
     CLI11_PARSE(app, argc, argv);
     if (names.empty()) names = all;
@@ -486,7 +538,7 @@ int main(int argc, char** argv) {
 
     auto imgs = base_images();
     std::map<std::string, std::vector<Row>> fresh;
-    for (const auto& [name, run] : EXPERIMENTS) {
+    for (const auto &[name, run] : EXPERIMENTS) {
         if (std::find(names.begin(), names.end(), name) == names.end()) continue;
         auto t0 = std::chrono::steady_clock::now();
         std::filesystem::remove("data/" + name + ".npz");

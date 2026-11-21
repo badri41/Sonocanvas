@@ -1,13 +1,18 @@
-// Score a real recording of a demo WAV: align it, decode it, and report AUC and SSIM.
-//
-//   bin/analyze_recording take.m4a --word DA321 --dist 2 --device phone [--take 1] [--video]
-//
-// Any format ffmpeg reads (a phone's .m4a, a .wav) is converted to 22050 Hz mono first. Writes a row
-// to results/acoustic.csv (re-running a take replaces its row), the image to figures/acoustic/, and
-// with --video also data/acoustic_video.npz for scene 7.
-//
-// Alignment: the delay is the peak of the cross-correlation of the band-limited recording with the
-// encoded signal, d^* = \arg\max_d |\sum_n r[n+d]\,x[n]|. decode() then sees exactly the clip.
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Score a real recording of a demo WAV: align it, decode it, and report AUC and SSIM.
+
+  bin/analyze_recording take.m4a --word DA321 --dist 2 --device phone [--take 1] [--video]
+
+Any format ffmpeg reads (a phone's .m4a, a .wav) is converted to 22050 Hz mono first. Writes a row
+to results/acoustic.csv (re-running a take replaces its row), the image to figures/acoustic/, and
+with --video also data/acoustic_video.npz for scene 7.
+
+Alignment: the delay is the peak of the cross-correlation of the band-limited recording with the
+encoded signal, d* = argmax_d |sum_n r[n+d]*x[n]|. decode() then sees exactly the clip.
+*/
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -28,7 +33,8 @@ constexpr double F_LO = 1000, F_HI = 8000;
 constexpr double MIN_PEAK_RATIO = 40;  // correct takes gave 130-158 in simulation, the wrong word 19
 
 // The recording as 22050 Hz mono, peak-normalised to 1, via ffmpeg.
-Signal read_audio(const std::string& path) {
+Signal read_audio(const std::string &path)
+{
     std::string tmp = (std::filesystem::temp_directory_path() / "sonocanvas_take.wav").string();
     std::string cmd = std::format("ffmpeg -loglevel error -y -i '{}' -ac 1 -ar {} '{}'", path, SR, tmp);
     if (std::system(cmd.c_str()) != 0) throw std::runtime_error("ffmpeg could not read " + path);
@@ -37,13 +43,14 @@ Signal read_audio(const std::string& path) {
     std::filesystem::remove(tmp);
     double peak = 1e-12;
     for (double v : r) peak = std::max(peak, std::abs(v));
-    for (double& v : r) v /= peak;
+    for (double &v : r) v /= peak;
     return r;
 }
 
 // Keep only F_LO..F_HI: zero every other DFT bin of the whole signal and transform back.
-Signal bandpass(const Signal& r) {
-    cv::Mat x(1, int(r.size()), CV_64F, const_cast<double*>(r.data())), X, y;
+Signal bandpass(const Signal &r)
+{
+    cv::Mat x(1, int(r.size()), CV_64F, const_cast<double *>(r.data())), X, y;
     cv::dft(x, X, cv::DFT_COMPLEX_OUTPUT);
     int L = int(r.size());
     for (int k = 0; k < L; ++k) {
@@ -55,17 +62,19 @@ Signal bandpass(const Signal& r) {
 }
 
 // |cross-correlation| of r with x at every delay where x fits inside r.
-std::vector<float> correlate(const Signal& r, const Signal& x) {
+std::vector<float> correlate(const Signal &r, const Signal &x)
+{
     cv::Mat rf, xf, c;
-    cv::Mat(1, int(r.size()), CV_64F, const_cast<double*>(r.data())).convertTo(rf, CV_32F);
-    cv::Mat(1, int(x.size()), CV_64F, const_cast<double*>(x.data())).convertTo(xf, CV_32F);
+    cv::Mat(1, int(r.size()), CV_64F, const_cast<double *>(r.data())).convertTo(rf, CV_32F);
+    cv::Mat(1, int(x.size()), CV_64F, const_cast<double *>(x.data())).convertTo(xf, CV_32F);
     cv::matchTemplate(rf, xf, c, cv::TM_CCORR);
     c = cv::abs(c);
     return std::vector<float>(c.ptr<float>(), c.ptr<float>() + c.cols);
 }
 
-// In-band SNR from the room noise before and after the clip: 10 \log_{10}(P_{clip}/P_{noise} - 1).
-double snr_db(const Signal& b, size_t d, size_t n) {
+// In-band SNR from the room noise before and after the clip: 10*log10(P_clip/P_noise - 1).
+double snr_db(const Signal &b, size_t d, size_t n)
+{
     size_t guard = SR / 10;  // skip the clip's onset and any tail
     double clip = 0, noise = 0;
     size_t quiet = 0;
@@ -77,7 +86,8 @@ double snr_db(const Signal& b, size_t d, size_t n) {
 }
 
 // Add or replace this take's row in results/acoustic.csv, sorted by word, distance, device, take.
-void save_row(const std::vector<std::string>& row) {
+void save_row(const std::vector<std::string> &row)
+{
     const std::string path = "results/acoustic.csv";
     std::vector<std::vector<std::string>> rows;
     std::ifstream in(path);
@@ -90,25 +100,28 @@ void save_row(const std::vector<std::string>& row) {
         if (!std::equal(f.begin(), f.begin() + 4, row.begin())) rows.push_back(f);
     }
     rows.push_back(row);
-    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
+    std::sort(rows.begin(), rows.end(), [](const auto &a, const auto &b) {
         return std::tuple(a[0], std::stod(a[1]), a[2], a[3]) < std::tuple(b[0], std::stod(b[1]), b[2], b[3]);
     });
     std::filesystem::create_directories("results");
     std::ofstream f(path);
     f << "word,dist_m,device,take,auc,ssim,psnr_db,delay_s,peak_ratio,snr_db\n";
-    for (const auto& r : rows) {
+    for (const auto &r : rows) {
         for (size_t i = 0; i < r.size(); ++i) f << (i ? "," : "") << r[i];
         f << "\n";
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     CLI::App app{"Score a recording of a demo WAV played through a speaker."};
     std::string recording, word = "DA321", device = "phone";
     double dist;
     int take = 1;
     bool video = false;
-    app.add_option("recording", recording, "the recording (any format ffmpeg reads)")->required()->check(CLI::ExistingFile);
+    app.add_option("recording", recording, "the recording (any format ffmpeg reads)")
+        ->required()
+        ->check(CLI::ExistingFile);
     app.add_option("--word", word, "the word in the WAV that was played");
     app.add_option("--dist", dist, "speaker-to-microphone distance in metres")->required();
     app.add_option("--device", device, "recording device, e.g. phone or mac");
@@ -131,7 +144,8 @@ int main(int argc, char** argv) {
     double ratio = c[d] / sorted[sorted.size() / 2];  // peak over median
     if (ratio < MIN_PEAK_RATIO)
         std::println("WARNING: weak correlation peak (ratio {:.1f} < {}). Check that the word and file match; "
-                     "these scores may be meaningless.", ratio, MIN_PEAK_RATIO);
+                     "these scores may be meaningless.",
+                     ratio, MIN_PEAK_RATIO);
 
     Signal y(r.begin() + d, r.begin() + d + e.x.size());
     Image rec = decode(y);
@@ -144,8 +158,9 @@ int main(int argc, char** argv) {
     std::filesystem::create_directories("figures/acoustic");
     save_figure("figures/acoustic/" + name + ".png", e.target, rec, "target",
                 std::format("recorded at {} m, {}: AUC {:.4f}, SSIM {:.3f}", dist, device, u, s));
-    std::println("{}: delay {:.3f} s, peak ratio {:.1f}, in-band SNR {:.1f} dB, AUC {:.4f}, SSIM {:.3f}, PSNR {:.1f} dB",
-                 name, d / double(SR), ratio, snr, u, s, q);
+    std::println(
+        "{}: delay {:.3f} s, peak ratio {:.1f}, in-band SNR {:.1f} dB, AUC {:.4f}, SSIM {:.3f}, PSNR {:.1f} dB", name,
+        d / double(SR), ratio, snr, u, s, q);
     std::println("wrote results/acoustic.csv and figures/acoustic/{}.png", name);
     if (video) {
         Npz out("data/acoustic_video.npz");

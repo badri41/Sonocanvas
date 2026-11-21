@@ -1,4 +1,9 @@
-// Windows, STFT and weighted overlap-add ISTFT. The DFT itself is OpenCV's cv::dft.
+/*
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Badri Bishal Das
+
+Windows, STFT and weighted overlap-add ISTFT. The DFT itself is OpenCV's cv::dft.
+*/
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -7,7 +12,8 @@
 
 namespace sc {
 
-std::vector<double> window(const std::string& name, int N) {
+std::vector<double> window(const std::string &name, int N)
+{
     std::vector<double> w(N);
     for (int n = 0; n < N; ++n) {
         double t = 2 * std::numbers::pi * n / N;
@@ -20,7 +26,8 @@ std::vector<double> window(const std::string& name, int N) {
     return w;
 }
 
-Spectrum stft(const Signal& x, int N, int H, const std::vector<double>& w) {
+Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
+{
     Signal xp(x.size() + N, 0.0);  // N/2 zeros on each side
     std::copy(x.begin(), x.end(), xp.begin() + N / 2);
     int M = 1 + int(xp.size() - N) / H;
@@ -34,13 +41,14 @@ Spectrum stft(const Signal& x, int N, int H, const std::vector<double>& w) {
     return Spectrum(F.colRange(0, N / 2 + 1).t());              // keep k = 0..N/2, as bins x frames
 }
 
-Signal istft(const Spectrum& X, int N, int H, const std::vector<double>& w) {
+Signal istft(const Spectrum &X, int N, int H, const std::vector<double> &w)
+{
     int M = X.cols;
     // Each frame's half spectrum in OpenCV's packed real format [Re_0, Re_1, Im_1, ..., Re_{N/2}],
     // so one inverse DFT per row returns the real frame y_m (the 1/N scale included).
     cv::Mat packed(M, N, CV_64F);
     for (int m = 0; m < M; ++m) {
-        double* row = packed.ptr<double>(m);
+        double *row = packed.ptr<double>(m);
         row[0] = X(0, m).real();
         for (int k = 1; k < N / 2; ++k) {
             row[2 * k - 1] = X(k, m).real();
@@ -61,7 +69,8 @@ Signal istft(const Spectrum& X, int N, int H, const std::vector<double>& w) {
     return Signal(y.begin() + N / 2, y.end() - N / 2);
 }
 
-Image magnitude(const Spectrum& X) {
+Image magnitude(const Spectrum &X)
+{
     Image mag(X.size());
     for (int k = 0; k < X.rows; ++k)
         for (int m = 0; m < X.cols; ++m) mag(k, m) = std::abs(X(k, m));
