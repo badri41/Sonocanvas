@@ -7,9 +7,8 @@ __pycache__/
 # Manim renders
 media/
 
-# Audio outputs (the demo presets are kept)
+# Audio outputs
 *.wav
-!demo/*.wav
 
 # TeX intermediates (paper/main.pdf is a deliverable, not ignored)
 *.aux
@@ -30,3 +29,8 @@ final/
 video/voice/
 build/
 bin/
+
+# Presentation material, kept on disk but not in git: the paper, the video and the demo presets
+paper/
+video/
+demo/
