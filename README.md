@@ -1,6 +1,6 @@
 # SONOCANVAS(1)
 
-Drawing with Sound. Individual project for DA321 Multimodal Data Processing, IIT Guwahati.
+Drawing with Sound. Individual project for DA3021 Multimodal Data Processing, IIT Guwahati.
 
 ## NAME
 
