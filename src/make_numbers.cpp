@@ -407,19 +407,25 @@ int main()
             std::format("Decoding survives a real speaker and microphone at {}\\,m, with mean AUC {}.", far, far_auc);
         A["Limit"] = "Acoustic results cover one room, one laptop speaker and one phone microphone.";
         A["Future"] = "Future work should extend the acoustic test to other rooms and devices.";
+        double sim_auc = std::stod(get('s', "text", "edges/snr=10", "auc"));
+        std::string versus;
+        if (mean("snr_db", far) > 10 && mean("auc", far) < sim_auc)
+            versus = std::format(" White-noise simulation at 10\\,dB gave an AUC of {} for the same word, at a lower SNR "
+                                 "than the recordings, so the real speaker and room do more damage than white noise.",
+                                 rnd(sim_auc, 4));
         sec = std::format(
             "\\subsection{{Acoustic validation}}\n"
             "We played the encoded DA321 clip through a laptop speaker and recorded it on a phone {}. "
             "Each recording was aligned by cross-correlation with the encoded signal and decoded with the unchanged "
             "decoder. "
             "Table~\\ref{{tab:acoustic}} reports means over takes. In-band SNR is estimated from room noise before and "
-            "after the clip.\n"
+            "after the clip.{}\n"
             "\\begin{{table}}[t]\n\\centering\n\\caption{{Recorded through a physical speaker and "
             "microphone.}}\n\\label{{tab:acoustic}}\n"
             "\\footnotesize\n\\begin{{tabular}}{{@{{}}ccccc@{{}}}}\n\\toprule\nDistance (m) & Takes & AUC & SSIM & SNR "
             "(dB) \\\\\n\\midrule\n"
             "{}\\bottomrule\n\\end{{tabular}}\n\\end{{table}}\n",
-            dists.size() == 1 ? std::format("at {}\\,m", far) : std::format("at {} distances", dists.size()), body);
+            dists.size() == 1 ? std::format("at {}\\,m", far) : std::format("at {} distances", dists.size()), versus, body);
     }
     std::ofstream("paper/acoustic.tex") << sec;
     for (std::string k : {"Abstract", "Contribution", "Conclusion", "Limit", "Future"})
