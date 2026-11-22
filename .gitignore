@@ -34,3 +34,6 @@ bin/
 paper/
 video/
 demo/
+
+# The author's to-do list
+CHECKLIST.md
