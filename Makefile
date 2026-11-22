@@ -1,17 +1,17 @@
 # SonoCanvas build and pipeline. `make` builds the C++ programs; `make help` lists the targets.
 
 CXX      := clang++
-CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Icpp -I/opt/homebrew/include/opencv5 -I/opt/homebrew/include \
-            -DSONOCANVAS_FONT=\"$(CURDIR)/cpp/fonts/DejaVuSans-Bold.ttf\"
+CXXFLAGS := -std=c++23 -O2 -Wall -Wextra -Isrc -I/opt/homebrew/include/opencv5 -I/opt/homebrew/include \
+            -DSONOCANVAS_FONT=\"$(CURDIR)/src/fonts/DejaVuSans-Bold.ttf\"
 LDLIBS   := -L/opt/homebrew/lib -lopencv_core -lopencv_imgproc -lopencv_imgcodecs -lopencv_freetype \
             -lopencv_geometry -lsndfile -lz
 PY       := .venv/bin/python
 
-LIB  := cpp/sonocanvas.cpp cpp/third_party/cnpy.cpp
-OBJ  := $(LIB:cpp/%.cpp=build/%.o)
+LIB  := src/sonocanvas.cpp src/third_party/cnpy.cpp
+OBJ  := $(LIB:src/%.cpp=build/%.o)
 BINS := bin/sonocanvas bin/experiments bin/analyze_recording bin/make_numbers bin/make_assets bin/test_core
 
-.PHONY: all help test experiments figures numbers paper assets final4k demo final clean
+.PHONY: all help test experiments figures numbers paper assets final4k final clean
 all: $(BINS)
 
 help:
@@ -23,10 +23,9 @@ help:
 	@echo "make paper        numbers, then paper/main.pdf"
 	@echo "make assets       data/video.npz for the Manim scenes"
 	@echo "make final4k      render the 3840x2160 30 fps video (video/render.sh 4k)"
-	@echo "make demo         regenerate demo/*.wav"
 	@echo "make final        assemble the presentation kit in final/"
 
-build/%.o: cpp/%.cpp cpp/sonocanvas.hpp
+build/%.o: src/%.cpp src/sonocanvas.hpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -64,15 +63,11 @@ assets: bin/make_assets
 final4k: assets
 	video/render.sh 4k
 
-demo: bin/sonocanvas
-	for w in DA321 HELLO IITG; do bin/sonocanvas encode $$w -o demo/$$w.wav; done
-
 final: bin/sonocanvas
 	rm -rf final && mkdir -p final/wav
 	cp paper/main.pdf final/SonoCanvas_paper.pdf
 	for w in DA321 HELLO IITG MMDP GABOR PIXEL; do \
 	    bin/sonocanvas encode $$w -o final/wav/$$w.wav --png final/wav/$$w.png; done
-	for w in DA321 HELLO IITG; do cmp final/wav/$$w.wav demo/$$w.wav; done  # the app's fallback files
 	if [ -f video/sonocanvas_final_4k.mp4 ]; then cp video/sonocanvas_final_4k.mp4 final/; \
 	else echo "No voiced 4K video yet: copying the silent 720p preview."; \
 	     cp video/sonocanvas_720p30.mp4 final/sonocanvas_DRAFT_no_voice_720p.mp4; fi

@@ -1,10 +1,8 @@
 """
 This handles a simple demo website for the project
 """
-import os
 import subprocess
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -12,9 +10,7 @@ import streamlit as st
 
 ROOT = Path(__file__).parent
 BIN = ROOT / "bin" / "sonocanvas"
-DEMO = ROOT / "demo"
 PRESETS = ("DA321", "HELLO", "IITG")
-FALLBACK_S = float(os.environ.get("SONOCANVAS_FALLBACK_S", 4.0))
 
 
 def sonocanvas(*args: str) -> dict:
@@ -34,34 +30,11 @@ def sonocanvas(*args: str) -> dict:
 def encode(text: str, mode: str, fixed: bool, image: bytes | None) -> dict:
     args = ["encode", text, "--mode", mode] + (["--fixed-font"] if fixed else [])
     if image is None:
-        return sonocanvas(*args) | {"source": "encoded live"}
+        return sonocanvas(*args)
     with tempfile.NamedTemporaryFile(suffix=".png") as f:
         f.write(image)
         f.flush()
-        return sonocanvas(*args, "--image", f.name) | {"source": "encoded live"}
-
-
-def prerendered(word: str) -> dict:
-    """The shipped demo/WORD.wav, decoded and scored now (decoding takes milliseconds)."""
-    return sonocanvas("decode", str(DEMO / f"{word}.wav"), word) | {"source": f"pre-rendered demo/{word}.wav", "sc": -1}
-
-
-@st.cache_resource
-def pool() -> tuple[ThreadPoolExecutor, dict]:
-    """One worker and its jobs, kept across reruns so a slow encode finishes in the background."""
-    return ThreadPoolExecutor(max_workers=1), {}
-
-
-def encode_presenting(word: str) -> dict:
-    ex, jobs = pool()
-    job = jobs.get(word) or jobs.setdefault(word, ex.submit(sonocanvas, "encode", word, "--mode", "edges"))
-    try:
-        return job.result(timeout=FALLBACK_S) | {"source": "encoded live"}
-    except TimeoutError:
-        if (DEMO / f"{word}.wav").exists():
-            return prerendered(word)
-        with st.spinner("Running Griffin-Lim..."):
-            return job.result() | {"source": "encoded live"}
+        return sonocanvas(*args, "--image", f.name)
 
 
 st.set_page_config(page_title="SonoCanvas", layout="centered")
@@ -100,10 +73,7 @@ if upload is None and not text:
     st.stop()
 
 try:
-    if present:
-        r = encode_presenting(text)
-    else:
-        r = encode(text, mode, fixed, upload.getvalue() if upload is not None else None)
+    r = encode(text, mode, fixed, upload.getvalue() if upload is not None else None)
 except subprocess.CalledProcessError as e:
     st.warning(f"This input could not be encoded: {e.stderr.decode().strip()}.")
     st.stop()
@@ -115,6 +85,5 @@ c1.metric("AUC (legibility)", f"{r['auc']:.3f}")
 c2.metric("SSIM", f"{r['ssim']:.3f}")
 c3.metric("PSNR", f"{r['psnr']:.1f} dB")
 st.image(r["png"], caption="target (top) and the picture decoded from the audio (bottom)")
-sc_txt = f", spectral convergence {r['sc']:.3f}" if r["sc"] >= 0 else ""
-st.caption(f"Source: {r['source']}{sc_txt}. Clip length {r['dur']:.1f} s. Phone app settings: linear frequency axis, "
-           f"range up to at least 8 kHz, time window of at least {r['dur']:.0f} s.")
+st.caption(f"Spectral convergence {r['sc']:.3f}. Clip length {r['dur']:.1f} s. Phone app settings: linear frequency "
+           f"axis, range up to at least 8 kHz, time window of at least {r['dur']:.0f} s.")

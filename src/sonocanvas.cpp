@@ -29,7 +29,7 @@ I want visible. The rest leans on libraries: FFT, filters and text are OpenCV, W
 #include "third_party/cnpy.h"
 
 #ifndef SONOCANVAS_FONT
-#define SONOCANVAS_FONT "cpp/fonts/DejaVuSans-Bold.ttf"
+#define SONOCANVAS_FONT "src/fonts/DejaVuSans-Bold.ttf"
 #endif
 
 namespace sc {

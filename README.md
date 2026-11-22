@@ -18,7 +18,7 @@ bin/experiments [NAME ...]
 bin/analyze_recording RECORDING --dist METRES [--word WORD] [--device NAME] [--take N] [--video]
 bin/make_numbers
 bin/make_assets
-make experiments | figures | numbers | paper | assets | video | demo | final | clean
+make experiments | figures | numbers | paper | assets | final4k | final | clean
 streamlit run app.py                   # http://localhost:8501/?present=1 for presentation mode
 ```
 
@@ -39,7 +39,7 @@ weighted overlap-add. Decoding is the analysis STFT, cropped to the same band.
 $$I \;\xrightarrow{\text{image\_to\_mag}}\; S \;\xrightarrow{\text{griffin\_lim}}\; x
 \;\xrightarrow{\text{stft, crop}}\; \hat I$$
 
-The STFT framing, the weighted overlap-add and Griffin–Lim are written by hand in `cpp/`. Libraries
+The STFT framing, the weighted overlap-add and Griffin–Lim are written by hand in `src/`. Libraries
 do the generic work:
 - **OpenCV:** the DFT (`cv::dft`), resizing, Sobel, dilation, the box filter for SSIM, and FreeType
   text;
@@ -57,7 +57,7 @@ With these defaults:
 - the decoded image is 325 × 431;
 - the WAV holds $H(M-1) = 110080$ samples (4.99 s), peak-normalised to 0.9.
 
-**Text canvas.** `render_text` draws DejaVu Sans Bold at 170 px (`cpp/fonts/`), centred on a 900 × 260
+**Text canvas.** `render_text` draws DejaVu Sans Bold at 170 px (`src/fonts/`), centred on a 900 × 260
 canvas. 900 px of width become the 5 s clip. Text wider than 92% of the canvas is handled in one of two
 ways:
 - **default:** the font is shrunk until the text fits;
@@ -166,7 +166,7 @@ Scores a real recording of a demo WAV that was played through a speaker. The ste
 |---|---|
 | `RECORDING` | The recording file. |
 | `--dist M` | Speaker-to-microphone distance in metres. Required. |
-| `--word W` | The word that was played (default `DA321`). It is re-encoded exactly as in `demo/`. |
+| `--word W` | The word that was played (default `DA321`). It is re-encoded with the default edge settings, like `bin/sonocanvas encode WORD`. |
 | `--device D` | Label for the recording device (default `phone`). |
 | `--take N` | Take number (default 1). Re-running a take replaces its row. |
 | `--video` | Also write `data/acoustic_video.npz`, which scene 7 of the video then uses. |
@@ -205,9 +205,6 @@ statistics are off (`.streamlit/config.toml`).
 | Or upload an image | PNG or JPEG, encoded as a 5 s clip. |
 | Preprocessing | `edges` or `raw`. |
 | Presentation mode | Toggle, or open the URL with `?present=1`. Large text, presets only, always 5 s. |
-
-In presentation mode, an encode that takes longer than `SONOCANVAS_FALLBACK_S` plays `demo/WORD.wav`
-instead. That file is bit-identical to a fresh encode. The caption names which source was used.
 
 ### video/render.sh [m|h|4k]
 
@@ -259,11 +256,11 @@ Assembles the presentation kit in `final/`:
 - six WAVs (DA321, HELLO, IITG, MMDP, GABOR, PIXEL), each with its answer-key PNG;
 - the voiced video, or the silent draft if no voiced video exists yet.
 
-It checks that the preset WAVs match `demo/` byte for byte, and prints the kit's total size.
+It prints the kit's total size.
 
-## LIBRARY (cpp/sonocanvas.hpp, namespace sc)
+## LIBRARY (src/sonocanvas.hpp, namespace sc)
 
-Declared in `cpp/sonocanvas.hpp`, implemented in one file, `cpp/sonocanvas.cpp`, in the same order.
+Declared in `src/sonocanvas.hpp`, implemented in one file, `src/sonocanvas.cpp`, in the same order.
 
 Types:
 - **`Image`** = `cv::Mat_<double>`: rows × cols, values in $[0,1]$, row 0 at the top.
@@ -402,7 +399,7 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | Path | Contents |
 |---|---|
 | `Makefile` | Build and pipeline targets (`make help`) |
-| `cpp/` | The library (`sonocanvas.hpp` + `sonocanvas.cpp`), the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
+| `src/` | The library (`sonocanvas.hpp` + `sonocanvas.cpp`), the five programs, `test_core.cpp`, `fonts/DejaVuSans-Bold.ttf`, `third_party/cnpy` (MIT; patched to write 0-d arrays) |
 | `plots.py`, `app.py` | The figures and the demo page (Python) |
 | `tests/test_app.py` | The app's tests (pytest) |
 | `data/*.npz` | Experiment and video data. Figures, paper and video are drawn from these. |
@@ -410,7 +407,6 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 | `figures/` | Experiment figures (PDF and PNG). `figures/acoustic/` holds recorded takes. |
 | `results/table.csv` | Every result: experiment, image, param, AUC, AUC std, SSIM, SSIM std, PSNR |
 | `results/acoustic.csv` | One row per recorded take |
-| `demo/*.wav` | Pre-rendered presets, the app's fallback |
 | `paper/` | `main.tex` (IEEEtran), `refs.bib`, generated `numbers.tex`, `table1.tex`, `acoustic.tex` |
 | `video/` | Manim scenes, `narration.md` (sets the timing), `render.sh`, `voice/` (your recordings) |
 | `final/` | Presentation kit (generated, not committed) |
@@ -419,7 +415,6 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 
 | Variable | Effect |
 |---|---|
-| `SONOCANVAS_FALLBACK_S` | Presentation-mode timeout in seconds before the app plays `demo/WORD.wav` (default 4). |
 | `PATH` | Must reach `clang++`, `ffmpeg`, `ffprobe` and, for the video, TinyTeX. |
 
 ## EXIT STATUS
@@ -428,7 +423,6 @@ $\|\,|Y|-S\,\|_F / \|S\|_F$.
 - **1** from `bin/sonocanvas` when the picture is empty or a WAV is not 22050 Hz, and from
   `bin/analyze_recording` when the recording is shorter than the clip.
 - **2** on a usage error.
-- **`make final`** fails if a preset WAV differs from `demo/`.
 - **`video/add_voice.py`** fails if the mix is longer than 5:00 or reaches 0 dBFS.
 
 ## EXAMPLES
@@ -449,7 +443,7 @@ make experiments                      # about 2.5 min, then figures
 make paper                            # numbers, then paper/main.pdf
 make final4k                          # after add_voice.py --prepare, if voice files exist
 python video/add_voice.py             # only with voice files
-make demo && make final
+make final
 ```
 
 ## RESULTS

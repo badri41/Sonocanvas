@@ -30,13 +30,9 @@ video/voice/
 build/
 bin/
 
-# Presentation material, kept on disk but not in git: the paper, the video and the demo presets
+# Presentation material, kept on disk but not in git: the paper and the video
 paper/
 video/
-demo/
-
-# The author's to-do list
-CHECKLIST.md
 
 # Derived from the recordings, which are ignored too
 data/acoustic_video.npz
