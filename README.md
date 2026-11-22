@@ -213,10 +213,11 @@ statistics are off (`.streamlit/config.toml`).
 In presentation mode, an encode that takes longer than `SONOCANVAS_FALLBACK_S` plays `demo/WORD.wav`
 instead. That file is bit-identical to a fresh encode. The caption names which source was used.
 
-### video/render.sh [m|h]
+### video/render.sh [m|h|4k]
 
-Renders the eight Manim scenes and joins them into `video/sonocanvas_720p30.mp4` (`m`, the default) or
-`video/sonocanvas_1080p60.mp4` (`h`). It prints the total duration. Each scene's length comes from
+Renders the eight Manim scenes and joins them into `video/sonocanvas_720p30.mp4` (`m`, the default),
+`video/sonocanvas_1080p60.mp4` (`h`) or `video/sonocanvas_2160p30.mp4` (`4k`, 3840x2160 at 30 fps, what
+`make final4k` runs). Preview with `m`. It prints the total duration. Each scene's length comes from
 `video/narration.md` through `video/timing.py`. The scenes read only `data/*.npz`.
 
 | Scene | Class | Content |
@@ -247,9 +248,9 @@ Prints each scene's length and writes the start and end times into the `narratio
 
 - **`--prepare`** trims the silence at both ends of each `video/voice/01.*` … `08.*`, and writes them to
   `media/voice/NN.wav` (48 kHz mono).
-- **No option:** after `render.sh h`, it mixes each voice file in where its scene's first sentence starts. The scene
+- **No option:** after `make final4k`, it mixes each voice file in where its scene's first sentence starts. The scene
   audio stays underneath at 0.7 gain. It then loudness-normalises in two passes to −16 LUFS, with a
-  −1.5 dBTP ceiling, and writes `video/sonocanvas_final_1080p.mp4`.
+  −1.5 dBTP ceiling, and writes `video/sonocanvas_final_4k.mp4`.
 
 ### video/check_scene.sh CLIP.mp4 OUT.png
 
@@ -451,7 +452,7 @@ Rebuild everything from scratch:
 make && make test
 make experiments                      # about 2.5 min, then figures
 make paper                            # numbers, then paper/main.pdf
-make assets && video/render.sh h      # after add_voice.py --prepare, if voice files exist
+make final4k                          # after add_voice.py --prepare, if voice files exist
 python video/add_voice.py             # only with voice files
 make demo && make final
 ```
