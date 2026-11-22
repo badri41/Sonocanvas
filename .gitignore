@@ -37,3 +37,6 @@ demo/
 
 # The author's to-do list
 CHECKLIST.md
+
+# Derived from the recordings, which are ignored too
+data/acoustic_video.npz
