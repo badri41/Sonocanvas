@@ -164,8 +164,6 @@ Scores a real recording of a demo WAV that was played through a speaker. The ste
 4. Decode the aligned 5 s.
 5. Report AUC, SSIM, PSNR, the delay, the correlation peak ratio and the in-band SNR.
 
-The procedure for recording takes is in `ACOUSTIC_TEST.md`.
-
 | Option | Meaning |
 |---|---|
 | `RECORDING` | The recording file. |
@@ -260,7 +258,6 @@ Writes a contact sheet of 6 evenly spaced frames and lists any still hold longer
 
 Assembles the presentation kit in `final/`:
 - the paper PDF;
-- `DEMO_CHECKLIST.md`;
 - six WAVs (DA321, HELLO, IITG, MMDP, GABOR, PIXEL), each with its answer-key PNG;
 - the voiced video, or the silent draft if no voiced video exists yet.
 
@@ -485,12 +482,12 @@ photograph uses raw, except in the first two rows.
 - AUC and SSIM measure fidelity to the target image, not readability. Small text can score high while
   being hard to read on a phone.
 - Acoustic recovery through a real speaker and microphone is measured only once `results/acoustic.csv`
-  exists (`ACOUSTIC_TEST.md`).
+  exists.
 - The message is visible to anyone who opens a spectrogram, so this is not steganography.
 
 ## SEE ALSO
 
-`ACOUSTIC_TEST.md`, `DEMO_CHECKLIST.md`, `paper/main.pdf`, `video/narration.md`.
+`paper/main.pdf`, `video/narration.md`.
 
 D. W. Griffin and J. S. Lim, "Signal estimation from modified short-time Fourier transform," *IEEE
 Trans. ASSP*, 1984. Z. Wang et al., "Image quality assessment: from error visibility to structural

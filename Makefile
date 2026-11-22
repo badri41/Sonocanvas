@@ -74,7 +74,6 @@ demo: bin/sonocanvas
 final: bin/sonocanvas
 	rm -rf final && mkdir -p final/wav
 	cp paper/main.pdf final/SonoCanvas_paper.pdf
-	cp DEMO_CHECKLIST.md final/
 	for w in DA321 HELLO IITG MMDP GABOR PIXEL; do \
 	    bin/sonocanvas encode $$w -o final/wav/$$w.wav --png final/wav/$$w.png; done
 	for w in DA321 HELLO IITG; do cmp final/wav/$$w.wav demo/$$w.wav; done  # the app's fallback files
