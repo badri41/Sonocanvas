@@ -11,7 +11,7 @@ LIB  := cpp/sonocanvas.cpp cpp/third_party/cnpy.cpp
 OBJ  := $(LIB:cpp/%.cpp=build/%.o)
 BINS := bin/sonocanvas bin/experiments bin/analyze_recording bin/make_numbers bin/make_assets bin/test_core
 
-.PHONY: all help test experiments figures numbers paper assets video final4k demo final clean
+.PHONY: all help test experiments figures numbers paper assets final4k demo final clean
 all: $(BINS)
 
 help:
@@ -22,7 +22,6 @@ help:
 	@echo "make numbers      paper macros, Table I and the README results table"
 	@echo "make paper        numbers, then paper/main.pdf"
 	@echo "make assets       data/video.npz for the Manim scenes"
-	@echo "make video        render the 1080p video (video/render.sh h)"
 	@echo "make final4k      render the 3840x2160 30 fps video (video/render.sh 4k)"
 	@echo "make demo         regenerate demo/*.wav"
 	@echo "make final        assemble the presentation kit in final/"
@@ -61,9 +60,6 @@ paper: numbers
 
 assets: bin/make_assets
 	bin/make_assets
-
-video: assets
-	video/render.sh h
 
 final4k: assets
 	video/render.sh 4k

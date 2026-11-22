@@ -102,8 +102,6 @@ make && make test
 - **Paper:** needs [tectonic](https://tectonic-typesetting.github.io), which downloads its TeX bundle
   the first time it runs.
 
-Your editor's clangd finds the headers through `compile_flags.txt`.
-
 ## COMMANDS
 
 ### bin/sonocanvas encode | decode
