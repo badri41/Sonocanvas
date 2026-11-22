@@ -1,10 +1,5 @@
 """
 This handles a simple demo website for the project
-
-All the work happens in the C++ program bin/sonocanvas (build it with `make`). This page only runs it,
-plays the WAV it writes, and shows the answer-key PNG and the scores it reports.
-Presentation mode (toggle, or open with ?present=1): three large presets, large text, and a fallback
-that decodes the pre-rendered demo/<WORD>.wav if encoding takes longer than FALLBACK_S.
 """
 import os
 import subprocess
