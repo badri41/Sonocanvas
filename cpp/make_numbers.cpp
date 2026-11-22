@@ -399,9 +399,9 @@ int main()
             body += std::format("{} & {} & {} & {} & {} \\\\\n", d, count(d), rnd(mean("auc", d), 4),
                                 rnd(mean("ssim", d)), rnd(mean("snr_db", d), 1));
         std::string far_auc = rnd(mean("auc", far), 4);
-        A["Abstract"] = std::format("Recordings of a laptop speaker on a phone microphone at up to {}\\,m give a mean "
+        A["Abstract"] = std::format("Recordings of a laptop speaker on a phone microphone {}{}\\,m give a mean "
                                     "stroke/background AUC of {} at that distance.",
-                                    far, far_auc);
+                                    dists.size() == 1 ? "at " : "at up to ", far, far_auc);
         A["Contribution"] = "\\item An acoustic validation through a physical speaker, room and phone microphone.";
         A["Conclusion"] =
             std::format("Decoding survives a real speaker and microphone at {}\\,m, with mean AUC {}.", far, far_auc);
@@ -409,7 +409,7 @@ int main()
         A["Future"] = "Future work should extend the acoustic test to other rooms and devices.";
         sec = std::format(
             "\\subsection{{Acoustic validation}}\n"
-            "We played the encoded DA321 clip through a laptop speaker and recorded it on a phone at {} distances. "
+            "We played the encoded DA321 clip through a laptop speaker and recorded it on a phone {}. "
             "Each recording was aligned by cross-correlation with the encoded signal and decoded with the unchanged "
             "decoder. "
             "Table~\\ref{{tab:acoustic}} reports means over takes. In-band SNR is estimated from room noise before and "
@@ -419,7 +419,7 @@ int main()
             "\\footnotesize\n\\begin{{tabular}}{{@{{}}ccccc@{{}}}}\n\\toprule\nDistance (m) & Takes & AUC & SSIM & SNR "
             "(dB) \\\\\n\\midrule\n"
             "{}\\bottomrule\n\\end{{tabular}}\n\\end{{table}}\n",
-            dists.size(), body);
+            dists.size() == 1 ? std::format("at {}\\,m", far) : std::format("at {} distances", dists.size()), body);
     }
     std::ofstream("paper/acoustic.tex") << sec;
     for (std::string k : {"Abstract", "Contribution", "Conclusion", "Limit", "Future"})

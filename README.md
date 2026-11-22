@@ -240,7 +240,7 @@ Prints each scene's length and writes the start and end times into the `narratio
 - Plain lines are spoken, `*italic*` lines are stage directions, `[1 s]` is a pause. Each sentence and pause is one slot.
 - Before a recording exists, a sentence lasts its word count at 140 wpm.
 - Once `media/voice/NN.wav` exists, slots come from the speech found by `ffmpeg silencedetect` (gaps of 0.3 s or more), so every animation starts on its sentence. If the gaps and sentences don't line up it says so and stretches the estimate instead.
-- `SONOCANVAS_ENDING=A` or `B` picks scene 7's ending (default B).
+- `SONOCANVAS_ENDING=A` (word readable at 1 m) or `B` (readable but noisy) picks scene 7's ending (default B).
 - Animations play at their natural speed (`say(..., rt=...)`, 1-3 s), then the scene holds until the sentence ends.
 - It flags a total over 5:00.
 
