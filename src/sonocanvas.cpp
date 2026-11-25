@@ -55,7 +55,7 @@ std::vector<double> window(const std::string &name, int N)
 Spectrum stft(const Signal &x, int N, int H, const std::vector<double> &w)
 {
     Signal xp(x.size() + N, 0.0);
-    std::copy(x.begin(), x.end(), xp.begin() + N / 2);
+    std::copy(x.begin(), x.end(), xp.begin() + N / 2); // padding done till now
     int M = 1 + int(xp.size() - N) / H;
 
     cv::Mat frames(M, N, CV_64F);

@@ -49,19 +49,20 @@ struct Params {
 std::vector<double> window(const std::string &name, int N);
 
 /*
-   STFT. I pad x with N/2 zeros on both sides so the first frame is centred on sample 0,
-   then X[k,m] = sum_{n=0..N-1} x[n + mH]*w[n]*exp(-j*2pi*k*n/N). You get (N/2+1) x M back.
+    gets the short time fourier transform result from an audio signal
 */
+
 Spectrum stft(const Signal &x, int n_fft, int hop, const std::vector<double> &win);
+
 
 /*
    Inverse STFT by weighted overlap-add (Griffin & Lim 1984). Every frame goes back through the
    IDFT, gets windowed again and summed, then I divide by the summed squared window:
      xhat[n] = sum_m w[n-mH]*y_m[n-mH] / sum_m w[n-mH]^2
-   That's the least-squares answer, so it does the right thing even when X isn't a real STFT,
-   which inside Griffin-Lim it never is.
+   This Estimator comes from minimizing the least squares estimator 
    The N/2 padding is cut off, so you get H*(M-1) samples.
 */
+
 Signal istft(const Spectrum &X, int n_fft, int hop, const std::vector<double> &win);
 
 /*
@@ -105,17 +106,8 @@ Image image_to_mag(const Image &img, const Params &p);
    Loads a grayscale image (8 or 16 bit) into [0, 1].
 */
 Image load(const std::string &path);
-
-/*
-   White DejaVu Sans Bold at 170 px, centred on a black w x h canvas. If the text is too wide
-   (more than 92% of w) I either shrink the font (fit = true) or make the canvas wider (fit = false).
-*/
-Image render_text(const std::string &text, int w = 900, int h = 260, bool fit = true);
-
-/*
-   How long the clip has to be so a wider canvas still gets 900 px per 5 s: d*max(1, w'/w).
-*/
-double text_duration(const Image &img, int w = 900, double dur = 5.0);
+Image render_text(const std::string &text, int w = 900, int h = 260, bool fit = true); // renders text in font
+double text_duration(const Image &img, int w = 900, double dur = 5.0); // duration for the text
 
 /*
    Stretches the image to [0, 1] and applies gamma. "raw" stops there. "edges" keeps only the
@@ -144,8 +136,8 @@ double psnr(const Image &a, const Image &b);
 
 /*
    How well the decoded image tells strokes from background. Pick a random stroke pixel s
-   (target > 0.5) and a random background pixel b; AUC is the chance that rec[s] > rec[b],
-   ties count half. 1 is perfect, 0.5 is a coin flip. SSIM gets confused by speckle on flat
+   (target > 0.5) and a random background pixel b; AUC is the probability that rec[s] > rec[b].
+   SSIM gets confused by speckle on flat
    areas, this doesn't, so this is the number I trust for "can you read it".
 */
 double auc(const Image &target, const Image &rec);
@@ -186,23 +178,20 @@ void write_wav(const std::string &path, const Signal &x, int sr);
 Signal read_wav(const std::string &path, int *sr);
 
 /*
-   The "answer key" PNG: target on top, decoded below, both in magma with a title.
+   plots the comparision between the actual and the estimate
 */
 void save_figure(const std::string &path, const Image &target, const Image &rec, const std::string &top,
                  const std::string &bottom);
 
 /*
-   Minimal CSV: no quoting, so no field may contain a comma (none of mine do).
-   split_csv also eats a trailing \r (files saved on Windows) and keeps an empty last field.
-   read_csv skips the header line, write_csv writes it and creates the folder if needed.
+   csv handler functions...
 */
 std::vector<std::string> split_csv(std::string line);
 std::vector<std::vector<std::string>> read_csv(const std::string &path);
 void write_csv(const std::string &path, const std::string &header, const std::vector<std::vector<std::string>> &rows);
 
 /*
-   Collects named arrays into a NumPy .npz so plots.py and the video can read them.
-   Images, vectors and tables (rows x cols) go in as float32, int vectors as int64, scalars as float64.
+   Numpy data .npz handlers in C++
 */
 class Npz {
 public:
